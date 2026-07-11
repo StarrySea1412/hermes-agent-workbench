@@ -1,0 +1,58 @@
+# ── Secrets / 环境 ─────────────────────────
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.docker
+*.pem
+*.key
+
+# ── Python ───────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+backend/venv/
+backend/.venv/
+backend/staticfiles/
+
+# ── Django 运行时 ─────────────────────────
+backend/logs/
+*.log
+backend/*.log
+ai-skill-app/*.log
+backend-runserver.*.log
+frontend-vite.*.log
+hermes-gateway.*.log
+codex-*.log
+
+# ── Node / 前端产物 ──────────────────────
+node_modules/
+dist/
+dist-ssr/
+ai-skill-app/dist/
+ai-skill-app/dist-lib/
+
+# ── IDE / 工具残留 ───────────────────────
+.vscode/
+.idea/
+.figma/
+.trae/
+.tmp/
+*.sw?
+.DS_Store
+
+# ── 本地媒体 / DB ───────────────────────
+backend/media/
+*.sqlite3
+backend/db.sqlite3
+
+# ── Hermes 本地运行时（含 API key / 会话 / 缓存）──
+.hermes-runtime/
+
+# ── 本机 Claude / 缓存 DB ────────────────
+.claude/
+*.db
+*.db-shm
+*.db-wal

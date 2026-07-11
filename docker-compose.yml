@@ -1,0 +1,168 @@
+#
+# docker-compose.yml — Hermes Agent Workbench + Hermes Gateway
+#
+# 使用方法:
+#   1. 复制 .env.example 为 .env 并填入配置
+#   2. cd ai-skill-app && npm install && npm run build && cd ..
+#   3. docker compose up -d
+#   4. docker compose exec backend python manage.py migrate
+#   5. docker compose exec backend python manage.py createsuperuser
+#
+# 访问:
+#   前端:  http://your-server/
+#   API:   http://your-server/api/
+#   Docs:  http://your-server/api/docs/
+#
+
+services:
+  # ──────────────────────────────────────────────
+  # Nginx 反向代理 + 前端静态文件
+  # ──────────────────────────────────────────────
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx.Dockerfile
+    ports:
+      - "80:80"
+      # - "443:443"   # SSL: 取消注释并配置证书
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # - ./docker/nginx/certs:/etc/nginx/certs:ro  # SSL 证书
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────
+  # Django 后端 (gunicorn)
+  # ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    env_file:
+      - ./backend/.env
+      - ./backend/.env.docker
+    environment:
+      - HERMES_GATEWAY_URL=http://hermes:8642/v1
+      - HERMES_GATEWAY_KEY=${HERMES_API_SERVER_KEY}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-*}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────
+  # Celery Worker (异步执行章节生成任务)
+  # ──────────────────────────────────────────────
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    env_file:
+      - ./backend/.env
+      - ./backend/.env.docker
+    environment:
+      - HERMES_GATEWAY_URL=http://hermes:8642/v1
+      - HERMES_GATEWAY_KEY=${HERMES_API_SERVER_KEY}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-*}
+    depends_on:
+      - postgres
+      - redis
+      - hermes
+    # --concurrency: 同时执行的任务数（建议 ≤ Hermes MAX_CONCURRENT_RUNS）
+    # --max-tasks-per-child: 防 worker 内存泄漏定期重启
+    command: [
+      "celery", "-A", "ai_skill_project", "worker",
+      "--loglevel=info",
+      "--concurrency=4",
+      "--max-tasks-per-child=50",
+      "--without-gossip", "--without-mingle", "--without-heartbeat"
+    ]
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────
+  # PostgreSQL 数据库
+  # ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ai_skill}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────────────────────────────────────
+  # Redis (Celery 消息队列 + 结果后端)
+  # ──────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ──────────────────────────────────────────────
+  # Hermes Agent Gateway (OpenAI 兼容 API)
+  # ──────────────────────────────────────────────
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes-gateway
+    restart: unless-stopped
+    volumes:
+      - hermes-data:/opt/data
+      - ./hermes_skills:/opt/data/skills:ro    # 标书撰写技能
+    environment:
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - API_SERVER_PORT=8642
+      - API_SERVER_KEY=${HERMES_API_SERVER_KEY:?HERMES_API_SERVER_KEY is required}
+      - API_SERVER_CORS_ORIGINS=*
+      - HERMES_UID=10000
+      - HERMES_GID=10000
+      # ── LLM API Keys (按需启用) ──
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    command: ["gateway", "run"]
+
+  # ──────────────────────────────────────────────
+  # Hermes Dashboard (可选 — Web 管理面板)
+  # ──────────────────────────────────────────────
+  hermes-dashboard:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes-dashboard
+    restart: unless-stopped
+    depends_on:
+      - hermes
+    volumes:
+      - hermes-data:/opt/data
+    environment:
+      - HERMES_UID=10000
+      - HERMES_GID=10000
+    command: ["dashboard", "--host", "0.0.0.0", "--port", "9119", "--no-open", "--insecure"]
+
+volumes:
+  pgdata:
+  redisdata:
+  hermes-data:

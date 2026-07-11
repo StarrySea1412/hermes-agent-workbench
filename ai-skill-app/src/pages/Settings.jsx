@@ -1,0 +1,570 @@
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { listAgentRuns, listAgentTools } from '../api/agents'
+import Sidebar from '../components/workbench/Sidebar'
+import { useAuth } from '../hooks/useAuth'
+import {
+  useAIConfig,
+  useCreateAIConfig,
+  useFetchAIModels,
+  useHermesMonitor,
+  useHermesSkills,
+  useTestAIConfig,
+  useUpdateAIConfig,
+} from '../hooks/useAIConfig'
+import './Settings.css'
+
+const DEFAULT_CONFIG = {
+  provider: 'openai',
+  api_key: '',
+  base_url: '',
+  model_name: '',
+  temperature: 0.7,
+  max_tokens: 2000,
+}
+
+const PROVIDERS = [
+  {
+    value: 'openai',
+    label: 'OpenAI 兼容接口',
+    defaultUrl: '',
+    defaultModel: '',
+    models: [],
+  },
+  {
+    value: 'deepseek',
+    label: 'DeepSeek',
+    defaultUrl: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+    models: ['deepseek-chat', 'deepseek-reasoner'],
+  },
+  {
+    value: 'qwen',
+    label: 'Qwen',
+    defaultUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    defaultModel: 'qwen-plus',
+    models: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
+  },
+  {
+    value: 'anthropic',
+    label: 'Anthropic Claude',
+    defaultUrl: 'https://api.anthropic.com',
+    defaultModel: 'claude-sonnet-4-20250514',
+    models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-latest'],
+  },
+  {
+    value: 'custom',
+    label: '自定义端点',
+    defaultUrl: '',
+    defaultModel: '',
+    models: [],
+  },
+]
+
+const CUSTOM_MODEL_VALUE = '__custom_model__'
+
+function buildConnectionNotice(result) {
+  const details = [
+    ['接口地址', result?.endpoint],
+    ['模型', result?.model],
+    ['错误类型', result?.error_type],
+    ['HTTP 状态', result?.status_code],
+    ['建议', result?.hint],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '')
+
+  return {
+    ok: Boolean(result?.success),
+    text: result?.message || '连接测试已完成。',
+    details,
+    diagnosticText: buildDiagnosticText(result, '模型连接测试'),
+  }
+}
+
+function buildModelFetchNotice(result, fallback = {}) {
+  const success = result?.success !== false
+  const details = [
+    ['模型列表接口', result?.endpoint],
+    ['提供方', result?.provider || fallback.provider],
+    ['基础 URL', result?.base_url || fallback.base_url],
+    ['模型数量', result?.count],
+    ['错误类型', result?.error_type],
+    ['HTTP 状态', result?.status_code],
+    ['建议', result?.hint],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== '')
+
+  return {
+    ok: success,
+    text: success ? `已获取 ${result?.count || 0} 个模型。` : (result?.message || '获取模型列表失败。'),
+    details,
+    diagnosticText: buildDiagnosticText(
+      {
+        ...fallback,
+        ...result,
+        success,
+        endpoint: result?.endpoint || '',
+        model: fallback.model_name || result?.model || '',
+      },
+      '模型列表获取',
+    ),
+  }
+}
+
+function buildDiagnosticText(result, title = '模型诊断') {
+  const lines = [
+    `AI-skill ${title}`,
+    `时间：${new Date().toLocaleString()}`,
+    `结果：${result?.success ? '成功' : '失败'}`,
+    `消息：${result?.message || ''}`,
+    `提供方：${result?.provider || ''}`,
+    `基础 URL：${result?.base_url || ''}`,
+    `接口地址：${result?.endpoint || ''}`,
+    `模型：${result?.model || ''}`,
+    `模型数量：${result?.count ?? ''}`,
+    `错误类型：${result?.error_type || ''}`,
+    `HTTP 状态：${result?.status_code ?? ''}`,
+    `建议：${result?.hint || ''}`,
+    `原始错误：${result?.error || ''}`,
+  ]
+  return lines.filter((line) => !line.endsWith('：')).join('\n')
+}
+
+async function copyText(text) {
+  if (!text) return false
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return true
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const ok = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  return ok
+}
+
+export default function Settings() {
+  const { user, logout, isLocalMode } = useAuth()
+  const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
+  const { data: tools = [] } = useQuery({ queryKey: ['agentTools'], queryFn: listAgentTools })
+  const { data: existingConfig, isLoading } = useAIConfig()
+  const { data: hermesMonitor, isFetching: isMonitorFetching, refetch: refetchHermes } = useHermesMonitor()
+  const { data: hermesSkills = [], isFetching: isSkillsFetching, refetch: refetchSkills } = useHermesSkills()
+  const createMutation = useCreateAIConfig()
+  const updateMutation = useUpdateAIConfig()
+  const testMutation = useTestAIConfig()
+  const fetchModelsMutation = useFetchAIModels()
+  const [edits, setEdits] = useState({})
+  const [remoteModels, setRemoteModels] = useState([])
+  const [notice, setNotice] = useState(null)
+  const [copyState, setCopyState] = useState('')
+
+  const formData = useMemo(() => {
+    const base = existingConfig || DEFAULT_CONFIG
+    return { ...base, ...edits }
+  }, [existingConfig, edits])
+
+  const currentProvider = PROVIDERS.find((provider) => provider.value === formData.provider) || PROVIDERS[0]
+  const modelOptions = useMemo(() => {
+    const remoteModelIds = remoteModels
+      .map((model) => (typeof model === 'string' ? model : model?.id))
+      .filter(Boolean)
+    const fallbackModels = currentProvider.models
+    const availableModels = remoteModelIds.length ? remoteModelIds : fallbackModels
+    return Array.from(new Set([...availableModels, formData.model_name].filter(Boolean))).sort()
+  }, [currentProvider, formData.model_name, remoteModels])
+  const selectedModelOption = modelOptions.includes(formData.model_name) ? formData.model_name : CUSTOM_MODEL_VALUE
+  const isSaving = createMutation.isPending || updateMutation.isPending
+  const connected = Boolean(hermesMonitor?.connected)
+  const enabledTools = tools.filter((tool) => tool.registered).length
+
+  const saveConfig = async () => {
+    const payload = { ...formData }
+    if (existingConfig && !payload.api_key) {
+      delete payload.api_key
+    }
+    if (existingConfig) {
+      return updateMutation.mutateAsync(payload)
+    }
+    return createMutation.mutateAsync(payload)
+  }
+
+  const handleProviderChange = (provider) => {
+    const providerInfo = PROVIDERS.find((item) => item.value === provider)
+    setRemoteModels([])
+    setEdits((prev) => ({
+      ...prev,
+      provider,
+      base_url: providerInfo?.defaultUrl || '',
+      model_name: providerInfo?.defaultModel || '',
+    }))
+  }
+
+  const handleFetchModels = async () => {
+    setNotice(null)
+    setCopyState('')
+    const apiKey = (formData.api_key || '').trim()
+    if (!existingConfig && !apiKey) {
+      setNotice({ ok: false, text: '获取模型前请先填写 API Key。' })
+      return
+    }
+
+    try {
+      const payload = {
+        provider: formData.provider || currentProvider.value,
+        base_url: formData.base_url || currentProvider.defaultUrl,
+      }
+      if (apiKey) {
+        payload.api_key = apiKey
+      }
+      const result = await fetchModelsMutation.mutateAsync(payload)
+      const models = result?.models || []
+      const resolvedBaseUrl = result?.endpoint?.replace(/\/models\/?$/, '')
+      setRemoteModels(models)
+      if (resolvedBaseUrl && resolvedBaseUrl !== formData.base_url) {
+        setEdits((prev) => ({ ...prev, base_url: resolvedBaseUrl }))
+      }
+      if (models.length && !formData.model_name) {
+        const firstModel = typeof models[0] === 'string' ? models[0] : models[0]?.id
+        if (firstModel) {
+          setEdits((prev) => ({ ...prev, model_name: firstModel }))
+        }
+      }
+      setNotice(buildModelFetchNotice({ ...result, count: models.length }, { ...payload, model_name: formData.model_name }))
+    } catch (error) {
+      setNotice(buildModelFetchNotice(
+        error.payload || { success: false, message: error.message || '获取模型列表失败。' },
+        {
+          provider: formData.provider || currentProvider.value,
+          base_url: formData.base_url || currentProvider.defaultUrl,
+          model_name: formData.model_name,
+        },
+      ))
+    }
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    setNotice(null)
+    setCopyState('')
+    if (!(formData.base_url || '').trim() || !(formData.model_name || '').trim()) {
+      setNotice({ ok: false, text: '请先填写基础 URL 和模型名称，或点击“获取模型”后选择模型。' })
+      return
+    }
+    try {
+      await saveConfig()
+      setEdits({})
+      setNotice({ ok: true, text: '配置已保存。' })
+    } catch (error) {
+      setNotice({ ok: false, text: `保存失败：${error.message}` })
+    }
+  }
+
+  const handleTest = async () => {
+    setNotice(null)
+    setCopyState('')
+    if (!existingConfig && !formData.api_key) {
+      setNotice({ ok: false, text: '测试前请先填写 API Key。' })
+      return
+    }
+    if (!(formData.base_url || '').trim() || !(formData.model_name || '').trim()) {
+      setNotice({ ok: false, text: '测试前请先填写基础 URL 和模型名称，或点击“获取模型”后选择模型。' })
+      return
+    }
+
+    try {
+      await saveConfig()
+      const result = await testMutation.mutateAsync()
+      setNotice(buildConnectionNotice(result))
+    } catch (error) {
+      if (error.payload?.success === false) {
+        setNotice(buildConnectionNotice(error.payload))
+      } else {
+        setNotice({ ok: false, text: error.message || '连接测试失败。' })
+      }
+    }
+  }
+
+  const handleCopyDiagnostics = async () => {
+    if (!notice?.diagnosticText) return
+    try {
+      const ok = await copyText(notice.diagnosticText)
+      setCopyState(ok ? '已复制' : '复制失败')
+    } catch {
+      setCopyState('复制失败')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="workbench-shell">
+        <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
+        <main className="page">
+          <div className="panel loading-panel">正在加载设置...</div>
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <div className="workbench-shell">
+      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
+
+      <main className="page">
+        <header className="page-header">
+          <div>
+            <p className="eyebrow">设置</p>
+            <h1>运行时与模型配置</h1>
+            <p>配置默认模型提供方，检查 Hermes 连通性，并保持工作台运行健康。</p>
+          </div>
+        </header>
+
+        <section className="metric-grid">
+          <MetricCard label="提供方" value={formData.provider || '未设置'} helper={formData.model_name || '尚未选择模型。'} />
+          <MetricCard label="Hermes" value={connected ? '在线' : '离线'} helper={hermesMonitor?.gateway_url || '网关尚未配置。'} />
+          <MetricCard label="技能" value={String(hermesSkills.length)} helper="后端发现的本地技能文件数量。" />
+          <MetricCard label="工具" value={String(enabledTools)} helper="模板可调用的已注册运行时工具。" />
+        </section>
+
+        <div className="content-grid detail-grid">
+          <section className="panel">
+            <form className="template-editor" onSubmit={handleSubmit}>
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">模型端点</p>
+                  <h2>提供方配置</h2>
+                </div>
+              </div>
+
+              <div className="field-grid">
+                <label className="field">
+                  <span>提供方</span>
+                  <select value={formData.provider} onChange={(event) => handleProviderChange(event.target.value)}>
+                    {PROVIDERS.map((provider) => (
+                      <option key={provider.value} value={provider.value}>{provider.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <span>模型名称</span>
+                  <div className="input-action-row">
+                    <select
+                      value={selectedModelOption}
+                      onChange={(event) => {
+                        if (event.target.value === CUSTOM_MODEL_VALUE) return
+                        setEdits((prev) => ({ ...prev, model_name: event.target.value }))
+                      }}
+                    >
+                      {modelOptions.map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                      <option value={CUSTOM_MODEL_VALUE}>自定义模型</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={formData.model_name || ''}
+                      onChange={(event) => setEdits((prev) => ({ ...prev, model_name: event.target.value }))}
+                      placeholder={currentProvider.defaultModel || '输入模型标识'}
+                    />
+                    <button type="button" className="secondary-button" onClick={handleFetchModels} disabled={fetchModelsMutation.isPending}>
+                      {fetchModelsMutation.isPending ? '获取中...' : '获取模型'}
+                    </button>
+                  </div>
+                </label>
+              </div>
+
+              <label className="field">
+                <span>API key</span>
+                <input
+                  type="password"
+                  value={formData.api_key || ''}
+                  onChange={(event) => setEdits((prev) => ({ ...prev, api_key: event.target.value }))}
+                  placeholder={existingConfig ? '留空则保留当前 Key。' : '输入提供方 API Key'}
+                />
+                <small className="inline-hint">Key 只保存在后端，并会在持久化前加密。</small>
+              </label>
+
+              <label className="field">
+                <span>基础 URL</span>
+                <input
+                  type="text"
+                  value={formData.base_url || ''}
+                  onChange={(event) => {
+                    setRemoteModels([])
+                    setEdits((prev) => ({ ...prev, base_url: event.target.value }))
+                  }}
+                  placeholder={currentProvider.defaultUrl || '输入 API 基础地址'}
+                />
+              </label>
+
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">生成默认值</p>
+                  <h2>运行时默认配置</h2>
+                </div>
+              </div>
+
+              <div className="field-grid">
+                <label className="field">
+                  <span>温度</span>
+                  <input
+                    className="settings-range"
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={formData.temperature}
+                    onChange={(event) => setEdits((prev) => ({ ...prev, temperature: parseFloat(event.target.value) }))}
+                  />
+                  <small className="inline-hint">当前值：{formData.temperature}</small>
+                </label>
+
+                <label className="field">
+                  <span>最大 Token</span>
+                  <input
+                    type="number"
+                    min="100"
+                    max="32000"
+                    value={formData.max_tokens}
+                    onChange={(event) => setEdits((prev) => ({
+                      ...prev,
+                      max_tokens: parseInt(event.target.value, 10) || DEFAULT_CONFIG.max_tokens,
+                    }))}
+                  />
+                </label>
+              </div>
+
+              {notice ? (
+                <div className={`panel-alert ${notice.ok ? '' : 'error'}`}>
+                  <div className="panel-alert-header">
+                    <strong>{notice.text}</strong>
+                    {notice.diagnosticText ? (
+                      <button type="button" className="inline-copy-button" onClick={handleCopyDiagnostics}>
+                        {copyState || '复制诊断'}
+                      </button>
+                    ) : null}
+                  </div>
+                  {notice.details?.length ? (
+                    <dl className="diagnostic-list">
+                      {notice.details.map(([label, value]) => (
+                        <div key={label}>
+                          <dt>{label}</dt>
+                          <dd>{String(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="editor-actions">
+                <button type="button" className="secondary-button" onClick={handleTest} disabled={testMutation.isPending || isSaving}>
+                  {testMutation.isPending ? '测试中...' : '测试连接'}
+                </button>
+                <button type="submit" className="primary-button" disabled={isSaving}>
+                  {isSaving ? '保存中...' : '保存配置'}
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <aside className="detail-rail">
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Hermes 监控</p>
+                  <h2>网关状态</h2>
+                </div>
+                <button type="button" className="secondary-button" onClick={() => refetchHermes()} disabled={isMonitorFetching}>
+                  {isMonitorFetching ? '刷新中...' : '刷新'}
+                </button>
+              </div>
+              <div className="stack-list">
+                <InfoRow label="网关" value={hermesMonitor?.gateway_url || '未配置'} />
+                <InfoRow label="状态" value={connected ? '已连接' : hermesMonitor?.error || '离线'} />
+                <InfoRow label="模型数" value={String(hermesMonitor?.models_count || 0)} />
+                <InfoRow label="API Key" value={hermesMonitor?.has_key ? '已配置' : '缺失'} />
+                <InfoRow label="上次检查" value={formatDate(hermesMonitor?.checked_at)} />
+              </div>
+              {hermesMonitor?.models?.length ? (
+                <div className="chip-list">
+                  {hermesMonitor.models.map((model) => (
+                    <code key={model}>{model}</code>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">技能</p>
+                  <h2>本地技能清单</h2>
+                </div>
+                <button type="button" className="secondary-button" onClick={() => refetchSkills()} disabled={isSkillsFetching}>
+                  {isSkillsFetching ? '刷新中...' : '刷新列表'}
+                </button>
+              </div>
+              <div className="skill-card-grid">
+                {hermesSkills.slice(0, 6).map((skill) => (
+                  <article key={skill.path} className="skill-card">
+                    <div className="skill-card-top">
+                      <strong>{skill.title || skill.name}</strong>
+                      <small>{skill.source}</small>
+                    </div>
+                    <code>{skill.path}</code>
+                    <p>{skill.description || '暂无描述。'}</p>
+                  </article>
+                ))}
+                {!hermesSkills.length ? <div className="empty-inline">还没有发现本地技能。</div> : null}
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">运行说明</p>
+                  <h2>这份配置会影响什么</h2>
+                </div>
+              </div>
+              <div className="stack-list">
+                <InfoRow label="通用内容" value="模型配置会影响兼容模式下的内容生成和相关导出。" />
+                <InfoRow label="智能体工作台" value="基于 Hermes 的智能体运行会优先使用 Hermes 网关，而不是这里的提供方表单。" />
+                <InfoRow label="本地技能" value="模板会引用从 hermes_skills/ 目录发现的技能路径。" />
+              </div>
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+function MetricCard({ label, value, helper }) {
+  return (
+    <article className="metric-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{helper}</small>
+    </article>
+  )
+}
+
+function InfoRow({ label, value }) {
+  return (
+    <div className="info-row">
+      <span>{label}</span>
+      <p>{value}</p>
+    </div>
+  )
+}
+
+function formatDate(value) {
+  if (!value) return '暂无'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
