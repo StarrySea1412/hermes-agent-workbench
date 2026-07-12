@@ -273,6 +273,8 @@ class AgentRunListSerializer(serializers.ModelSerializer):
             "memory_ids",
             "file_ids",
             "session_id",
+            "conversation_id",
+            "source",
             "created_at",
             "updated_at",
             "started_at",

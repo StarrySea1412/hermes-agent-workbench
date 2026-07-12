@@ -52,8 +52,17 @@ export default function ChatSidebar({
         <NavLink to="/" end className={() => `sidebar-nav-link ${isChatRoute ? 'active' : ''}`}>
           会话
         </NavLink>
+        <NavLink to="/files" className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}>
+          资料
+        </NavLink>
+        <NavLink to="/runs" className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}>
+          任务
+        </NavLink>
+        <NavLink to="/skills" className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}>
+          技能
+        </NavLink>
         <NavLink to="/settings" className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}>
-          运行
+          设置
         </NavLink>
       </nav>
 

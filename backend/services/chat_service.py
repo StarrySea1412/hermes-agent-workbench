@@ -1,6 +1,7 @@
 import json
 import logging
 
+from apps.agents.models import AgentRun
 from apps.ai_config.models import AIConfig
 from apps.projects.models import Message
 from apps.tools import registry, schemas
@@ -8,6 +9,7 @@ from services.ai_service import AIService, describe_ai_exception
 from services.document_analyzer import DocumentAnalyzer
 from services.hermes_service import build_session_id, create_hermes_service
 from services.tool_call_parser import parse_tool_calls
+from services.tool_loop import run_tool_loop, summarize_tool_result
 
 logger = logging.getLogger("api")
 
@@ -144,6 +146,11 @@ class ChatService:
         tool_events = []
         used_tools = []
         thoughts = []
+        agent_run = None
+        try:
+            agent_run = self._start_chat_agent_run(conversation, user_content, files, session_id)
+        except Exception:
+            logger.exception("Failed to create AgentRun for conversation_id=%s", conversation.id)
 
         yield "status", {
             "stage": "session_ready",
@@ -152,6 +159,7 @@ class ChatService:
             "mode": conversation.mode,
             "file_count": len(files),
             "tool_names": tool_names,
+            "agent_run_id": getattr(agent_run, "id", None),
         }
 
         for thought in self.build_reasoning_trace(conversation, user_content, attachment_ids=attachment_ids):
@@ -172,6 +180,7 @@ class ChatService:
                     tool_events,
                     used_tools,
                     gateway_label="hermes",
+                    agent_run=agent_run,
                 )
                 return
             except Exception as exc:
@@ -199,6 +208,7 @@ class ChatService:
                     tool_events,
                     used_tools,
                     gateway_label="compat",
+                    agent_run=agent_run,
                 )
                 return
             except Exception as exc:
@@ -212,6 +222,18 @@ class ChatService:
                     "diagnostic": diagnostic,
                 }
 
+        if agent_run is not None:
+            try:
+                from django.utils import timezone
+                agent_run.update_status_atomic(
+                    "failed",
+                    error="Fell back to local reply; upstream chat unavailable.",
+                    completed_at=timezone.now(),
+                    tools_used=list(used_tools),
+                )
+            except Exception:
+                logger.exception("Failed to mark chat AgentRun failed")
+
         reply = self._fallback_or_ai_reply(conversation, user_content, attachment_ids=attachment_ids, allow_ai=not compat)
         metadata = {
             **self.extract_delivery_metadata(reply),
@@ -223,6 +245,7 @@ class ChatService:
             "tool_events": tool_events,
             "used_tools": used_tools,
             "file_count": len(files),
+            "agent_run_id": getattr(agent_run, "id", None),
         }
         for chunk in chunk_text(reply):
             yield "delta", {"content": chunk}
@@ -358,114 +381,132 @@ class ChatService:
         tool_events,
         used_tools,
         gateway_label,
+        agent_run=None,
     ):
-        native_tools = schemas.openai_tools(tool_names)
-        tools_prompt_native = bool(native_tools)
-        tools_prompt_text = schemas.prompt_tools_section(tool_names)
         file_prompt = self._build_file_prompt(files)
         extra_headers = {"X-Hermes-Session-Id": session_id} if gateway_label == "compat" and session_id else None
+        pending_events = []
 
-        for turn_index in range(MAX_HERMES_TURNS):
-            system_prompt = self._build_system_prompt(
+        def build_system_prompt(native_tools_enabled, tools_prompt_text):
+            return self._build_system_prompt(
                 conversation,
                 file_prompt,
-                "" if tools_prompt_native else tools_prompt_text,
+                "" if native_tools_enabled else tools_prompt_text,
             )
 
-            try:
-                response = agent.chat_with_tools(
-                    history,
-                    tools=native_tools if tools_prompt_native else None,
-                    system_prompt=system_prompt,
-                    tool_choice="auto",
-                    extra_headers=extra_headers,
-                )
-                message = response.choices[0].message
-            except Exception as exc:
-                error_text = str(exc)
-                if tools_prompt_native and ("tool" in error_text.lower() or "400" in error_text):
-                    logger.info("Falling back to prompt-based tool calls for conversation %s: %s", conversation.id, exc)
-                    tools_prompt_native = False
-                    yield "status", {
-                        "stage": "tool_fallback",
-                        "gateway": gateway_label,
-                        "session_id": session_id,
-                        "message": "当前模型不接受原生 tools，已切到提示词式工具调用。",
-                    }
-                    continue
-                raise
+        def on_event(event_type, payload):
+            pending_events.append((event_type, payload))
+            if event_type == "thought":
+                thoughts.append(payload)
+            elif event_type == "tool_call" and payload not in tool_events:
+                tool_events.append(payload)
+            elif event_type == "tool_result" and agent_run is not None:
+                self._record_tool_step(agent_run, payload)
 
-            tool_calls, assistant_text = parse_tool_calls(message)
-            if not tool_calls:
-                if gateway_label == "hermes" and _looks_like_gateway_tool_block(assistant_text):
-                    raise RuntimeError("Hermes gateway stopped on internal file-execution permissions.")
-                reply = assistant_text or "Hermes 已完成本轮，但没有返回可显示文本。"
-                metadata = {
-                    **self.extract_delivery_metadata(reply),
+        tool_context = {
+            "user": self.user,
+            "user_id": self.user.id,
+            "project_id": conversation.project_id,
+            "conversation_id": conversation.id,
+            "run_id": getattr(agent_run, "id", None),
+        }
+
+        loop_result = run_tool_loop(
+            agent=agent,
+            history=history,
+            tool_names=tool_names,
+            build_system_prompt=build_system_prompt,
+            tool_context=tool_context,
+            max_turns=MAX_HERMES_TURNS,
+            extra_headers=extra_headers,
+            on_event=on_event,
+        )
+
+        for event_type, payload in pending_events:
+            if event_type == "status":
+                yield "status", {
+                    "stage": payload.get("stage") or "tool_fallback",
                     "gateway": gateway_label,
                     "session_id": session_id,
-                    "model_name": self._get_runtime_model_name(agent),
-                    "mode": conversation.mode,
-                    "thoughts": thoughts,
-                    "tool_events": tool_events,
-                    "used_tools": used_tools,
-                    "file_count": len(files),
+                    "message": payload.get("message", ""),
                 }
-                for chunk in chunk_text(reply):
-                    yield "delta", {"content": chunk}
-                yield "done", {"reply": reply, "metadata": metadata}
-                return
+            elif event_type == "thought":
+                yield "thought", payload
+            elif event_type == "tool_call":
+                yield "tool_call", payload
+            elif event_type == "tool_result":
+                yield "tool_result", payload
 
-            for tool_index, tool_call in enumerate(tool_calls, start=1):
-                name = tool_call.get("name") or ""
-                args = tool_call.get("args") or {}
-                thought_text = (tool_call.get("thought") or "").strip()
-                call_id = f"turn-{turn_index + 1}-tool-{tool_index}"
-                event_record = {
-                    "id": call_id,
-                    "name": name,
-                    "args": args,
-                    "thought": thought_text,
-                    "status": "running",
-                }
-                tool_events.append(event_record)
+        for name in loop_result.used_tools:
+            if name not in used_tools:
+                used_tools.append(name)
 
-                if thought_text:
-                    thought = {
-                        "title": f"准备调用 {name}",
-                        "content": thought_text,
-                    }
-                    thoughts.append(thought)
-                    yield "thought", thought
+        if loop_result.exhausted:
+            raise RuntimeError(f"Hermes exhausted {MAX_HERMES_TURNS} turns without a final answer.")
 
-                yield "tool_call", event_record
+        reply = loop_result.reply or "Hermes completed this turn without displayable text."
+        if gateway_label == "hermes" and _looks_like_gateway_tool_block(reply):
+            raise RuntimeError("Hermes gateway stopped on internal file-execution permissions.")
 
-                if name not in tool_names:
-                    result = {"ok": False, "error": f"Tool '{name}' is not enabled in Hermes Chat."}
-                else:
-                    result = registry.execute_tool(name, args, {
-                        "user": self.user,
-                        "user_id": self.user.id,
-                        "project_id": conversation.project_id,
-                        "conversation_id": conversation.id,
-                    })
+        if agent_run is not None:
+            from django.utils import timezone
 
-                event_record["status"] = "ok" if result.get("ok") else "error"
-                event_record["result"] = result
-                event_record["result_preview"] = summarize_tool_result(result)
-                yield "tool_result", event_record
+            agent_run.update_status_atomic(
+                "done",
+                answer=reply,
+                tools_used=list(used_tools),
+                completed_at=timezone.now(),
+            )
 
-                if name and name not in used_tools:
-                    used_tools.append(name)
+        metadata = {
+            **self.extract_delivery_metadata(reply),
+            "gateway": gateway_label,
+            "session_id": session_id,
+            "model_name": self._get_runtime_model_name(agent),
+            "mode": conversation.mode,
+            "thoughts": thoughts,
+            "tool_events": tool_events,
+            "used_tools": used_tools,
+            "file_count": len(files),
+            "agent_run_id": getattr(agent_run, "id", None),
+        }
+        for chunk in chunk_text(reply):
+            yield "delta", {"content": chunk}
+        yield "done", {"reply": reply, "metadata": metadata}
 
-                result_record = json.dumps(result, ensure_ascii=False)[:4000]
-                if thought_text:
-                    history.append({"role": "assistant", "content": thought_text})
-                if tool_index == 1 and assistant_text and assistant_text.strip():
-                    history.append({"role": "assistant", "content": assistant_text.strip()[:1500]})
-                history.append({"role": "user", "content": f"Tool {name} result:\n{result_record}"})
+    def _record_tool_step(self, agent_run, payload):
+        if agent_run is None:
+            return
+        try:
+            from apps.agents.orchestrator import _emit_step
 
-        raise RuntimeError(f"Hermes 在 {MAX_HERMES_TURNS} 轮内没有产出最终回答。")
+            order = (agent_run.step_count or 0) + 1
+            _emit_step(
+                agent_run,
+                order=order,
+                step_type="tool_result",
+                status=payload.get("status") or "ok",
+                tool_name=payload.get("name") or "",
+                tool_args=payload.get("args") or {},
+                tool_result=payload.get("result"),
+                thought=payload.get("thought") or "",
+            )
+        except Exception:
+            logger.exception("Failed to record tool step for run_id=%s", getattr(agent_run, "id", None))
+
+    def _start_chat_agent_run(self, conversation, user_content, files, session_id):
+        file_ids = [f.id for f in files if getattr(f, "id", None)]
+        return AgentRun.objects.create(
+            user=self.user,
+            task=user_content,
+            status="running",
+            session_id=session_id or "",
+            file_ids=file_ids,
+            conversation=conversation,
+            source="chat_turn",
+            max_steps=MAX_HERMES_TURNS,
+        )
+
 
 
 def chunk_text(text, size=24):

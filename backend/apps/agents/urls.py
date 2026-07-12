@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path
 
 from apps.agents import views
@@ -16,8 +17,12 @@ urlpatterns = [
     path("agent-runs/<int:run_id>/save-memory", views.agent_run_save_memory),
     path("agent-runs/<int:run_id>/cancel", views.cancel_agent_run),
     path("agent-runs/<int:run_id>/execute-stream", views.execute_agent_run_stream),
-    path("bids/<int:bid_id>/multi-agent/workflows", views.bid_multi_agent_workflows),
-    path("bids/<int:bid_id>/multi-agent/workflows/<int:workflow_id>", views.bid_multi_agent_workflow_detail),
-    path("bids/<int:bid_id>/multi-agent/workflows/<int:workflow_id>/execute", views.execute_bid_multi_agent_workflow),
-    path("bids/<int:bid_id>/multi-agent/workflows/<int:workflow_id>/cancel", views.cancel_bid_multi_agent_workflow),
 ]
+
+if getattr(settings, "ENABLE_LEGACY_BIDS", False):
+    urlpatterns += [
+        path("bids/<int:bid_id>/multi-agent/workflows", views.bid_multi_agent_workflows),
+        path("bids/<int:bid_id>/multi-agent/workflows/<int:workflow_id>", views.bid_multi_agent_workflow_detail),
+        path("bids/<int:bid_id>/multi-agent/workflows/<int:workflow_id>/execute", views.execute_bid_multi_agent_workflow),
+        path("bids/<int:bid_id>/multi-agent/workflows/<int:workflow_id>/cancel", views.cancel_bid_multi_agent_workflow),
+    ]

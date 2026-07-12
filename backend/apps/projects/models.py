@@ -61,7 +61,7 @@ class Conversation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="conversations")
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="conversations")
     title = models.CharField(max_length=256, default="Untitled conversation")
-    mode = models.CharField(max_length=32, choices=MODE_CHOICES, default="deck")
+    mode = models.CharField(max_length=32, choices=MODE_CHOICES, default="chat")
     summary = models.TextField(blank=True, default="")
     is_pinned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

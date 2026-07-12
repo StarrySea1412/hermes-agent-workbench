@@ -1,4 +1,5 @@
 import os
+import warnings
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -31,6 +32,13 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
+
+if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
+    warnings.warn(
+        'DJANGO_SECRET_KEY is still the insecure default. Set a real secret in production.',
+        RuntimeWarning,
+        stacklevel=1,
+    )
 
 # ──────────────────────────────────────────────
 # 应用配置
@@ -92,23 +100,40 @@ WSGI_APPLICATION = 'ai_skill_project.wsgi.application'
 # 数据库
 # ──────────────────────────────────────────────
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'ai_skill'),
-        'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+_db_engine = os.getenv('DB_ENGINE', 'sqlite').lower()
+if _db_engine in ('postgres', 'postgresql'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'ai_skill'),
+            'USER': os.environ.get('DB_USER', 'postgres'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / os.getenv('SQLITE_PATH', 'db.sqlite3'),
+        }
+    }
 
 # ──────────────────────────────────────────────
 # 认证
 # ──────────────────────────────────────────────
 
 AUTH_USER_MODEL = 'users.User'
-AUTH_PASSWORD_VALIDATORS = []
+if DEBUG:
+    AUTH_PASSWORD_VALIDATORS = []
+else:
+    AUTH_PASSWORD_VALIDATORS = [
+        {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+        {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+        {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+        {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    ]
 
 LANGUAGE_CODE = 'zh-hans'
 TIME_ZONE = 'Asia/Shanghai'
@@ -183,6 +208,16 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRE_MI
 # LOCAL_SINGLE_USER_MODE 仅用于本地单机调试（绕过鉴权），默认关闭以防误带入生产。
 LOCAL_SINGLE_USER_MODE = os.getenv('LOCAL_SINGLE_USER_MODE', 'False').lower() in ('true', '1', 'yes')
 
+if not DEBUG and JWT_SECRET_KEY == 'dev-secret-key-please-change-in-production':
+    warnings.warn(
+        'JWT_SECRET_KEY is still the development default. Set a real secret in production.',
+        RuntimeWarning,
+        stacklevel=1,
+    )
+
+# Bids / multi-agent workflows are legacy and off by default.
+ENABLE_LEGACY_BIDS = os.getenv('ENABLE_LEGACY_BIDS', 'False').lower() in ('true', '1', 'yes')
+
 # ──────────────────────────────────────────────
 # AI 配置
 # ──────────────────────────────────────────────
@@ -222,6 +257,15 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = True  # worker 崩溃时任务重新入队�
 
 # 稳妥的可见性超时（避免长任务被重复分发）
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+CELERY_TASK_ALWAYS_EAGER = os.getenv(
+    'CELERY_TASK_ALWAYS_EAGER',
+    'true' if DEBUG else 'false',
+).lower() in ('true', '1', 'yes')
+CELERY_TASK_EAGER_PROPAGATES = True
+if CELERY_TASK_ALWAYS_EAGER and not os.getenv('CELERY_BROKER_URL'):
+    CELERY_BROKER_URL = 'memory://'
+    CELERY_RESULT_BACKEND = 'cache+memory://'
 
 # ──────────────────────────────────────────────
 # 日志

@@ -45,6 +45,8 @@ services:
     environment:
       - HERMES_GATEWAY_URL=http://hermes:8642/v1
       - HERMES_GATEWAY_KEY=${HERMES_API_SERVER_KEY}
+      - DB_ENGINE=postgres
+      - DB_ENGINE=postgres
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
@@ -69,6 +71,8 @@ services:
     environment:
       - HERMES_GATEWAY_URL=http://hermes:8642/v1
       - HERMES_GATEWAY_KEY=${HERMES_API_SERVER_KEY}
+      - DB_ENGINE=postgres
+      - DB_ENGINE=postgres
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
@@ -131,7 +135,7 @@ services:
     restart: unless-stopped
     volumes:
       - hermes-data:/opt/data
-      - ./hermes_skills:/opt/data/skills:ro    # 标书撰写技能
+      - ./hermes_skills:/opt/data/skills:ro    # Hermes skills (agent-engineering + optional bid-writing)
     environment:
       - API_SERVER_ENABLED=true
       - API_SERVER_HOST=0.0.0.0

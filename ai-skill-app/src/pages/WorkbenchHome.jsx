@@ -49,7 +49,7 @@ export default function WorkbenchHome() {
       title: '交付产物',
       state: `${finishedRuns} 次完成`,
       description: '查看历史运行、工具轨迹、诊断信息和导出的 Excel、Word、Markdown 文件。',
-      action: '运行记录',
+      action: '任务历史',
       path: '/runs',
     },
   ]
@@ -172,7 +172,7 @@ export default function WorkbenchHome() {
                 <p>{run.answer_preview || run.error || '等待执行。'}</p>
               </button>
             ))}
-            {!recentRuns.length ? <EmptyInline text="还没有运行记录。先用上面的编排器创建第一个任务吧。" /> : null}
+            {!recentRuns.length ? <EmptyInline text="还没有任务历史。先用上面的编排器创建第一个任务吧。" /> : null}
           </div>
         </section>
       </main>

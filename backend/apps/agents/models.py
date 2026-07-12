@@ -10,7 +10,7 @@ class Agent(models.Model):
     slug = models.CharField(max_length=64, unique=True, verbose_name="Slug")
     skill = models.CharField(
         max_length=128,
-        default="bid-writing/bid-chapter-writer",
+        default="agent-engineering/general-operator",
         help_text="Skill path under hermes_skills without the .md suffix.",
         verbose_name="Skill",
     )
@@ -99,6 +99,29 @@ class AgentRun(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    conversation = models.ForeignKey(
+        "projects.Conversation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="agent_runs",
+        verbose_name="Conversation",
+    )
+    message = models.ForeignKey(
+        "projects.Message",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="agent_runs",
+        verbose_name="Message",
+    )
+    source = models.CharField(
+        max_length=32,
+        default="manual",
+        db_index=True,
+        help_text="chat_turn | manual | workflow",
+        verbose_name="Source",
+    )
 
     class Meta:
         db_table = "agent_runs"

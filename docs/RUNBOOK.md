@@ -158,3 +158,10 @@ $null = [scriptblock]::Create((Get-Content -LiteralPath .\start-ai-skill.ps1 -Ra
 $null = [scriptblock]::Create((Get-Content -LiteralPath .\stop-ai-skill.ps1 -Raw -Encoding UTF8))
 $null = [scriptblock]::Create((Get-Content -LiteralPath .\status-ai-skill.ps1 -Raw -Encoding UTF8))
 ```
+
+
+## Local database and legacy bids
+
+- Default local DB is SQLite (`DB_ENGINE=sqlite` or unset). Use `DB_ENGINE=postgres` for Docker/production.
+- Bids / multi-agent workflow APIs are behind `ENABLE_LEGACY_BIDS=true` (frontend: `VITE_ENABLE_LEGACY_BIDS=true`).
+- Chat turns create linked `AgentRun` rows with `source=chat_turn` for task history.

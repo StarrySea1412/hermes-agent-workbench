@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import RunStatusBadge from './RunStatusBadge'
 import { useHermesMonitor } from '../../hooks/useAIConfig'
+import { ENABLE_LEGACY_BIDS } from '../../config/features'
 
 export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false }) {
   const navigate = useNavigate()
@@ -26,26 +27,11 @@ export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false
         <NavLink to="/" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           聊天
         </NavLink>
-        <NavLink to="/agent" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          总览
+        <NavLink to="/files" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          资料
         </NavLink>
         <NavLink to="/runs" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          运行
-        </NavLink>
-        <NavLink to="/workflows" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          工作流
-        </NavLink>
-        <NavLink to="/templates" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          模板
-        </NavLink>
-        <NavLink to="/tools" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          工具
-        </NavLink>
-        <NavLink to="/files" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          文件
-        </NavLink>
-        <NavLink to="/memories" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          记忆
+          任务历史
         </NavLink>
         <NavLink to="/skills" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           技能
@@ -53,6 +39,23 @@ export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false
         <NavLink to="/settings" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           设置
         </NavLink>
+        <NavLink to="/agent" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          总览
+        </NavLink>
+        <NavLink to="/templates" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          模板
+        </NavLink>
+        <NavLink to="/tools" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          工具
+        </NavLink>
+        <NavLink to="/memories" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          记忆
+        </NavLink>
+        {ENABLE_LEGACY_BIDS ? (
+          <NavLink to="/workflows" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            工作流（旧）
+          </NavLink>
+        ) : null}
       </nav>
 
       <section className="sidebar-panel">

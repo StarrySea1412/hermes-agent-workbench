@@ -8,6 +8,34 @@ AI-skill 是一个本地优先的 Hermes Agent 工作台。当前主路径是：
 - Django 后端：会话、项目资料、模型配置、Hermes 监控、工具调用和文件导出
 - Hermes Gateway 本地运行链路：通过 OpenAI-compatible `/v1` 接口承接聊天和工具调用
 
+
+## 产品主线
+
+当前主产品是 **通用 Hermes 聊天工作台**：
+
+1. 配置模型与 Hermes 网关（`/settings`）
+2. 打开聊天会话（`/`）
+3. 上传资料（`/files` 或会话内）
+4. 观察工具调用与任务历史（`/runs`）
+5. 下载导出产物
+
+标书 / multi-agent 工作流已降级为 **legacy**，默认关闭：
+
+- 后端：`ENABLE_LEGACY_BIDS=true`
+- 前端：`VITE_ENABLE_LEGACY_BIDS=true`
+
+## 本地数据库
+
+默认使用 **SQLite**（`backend/db.sqlite3`），无需本机 PostgreSQL。
+
+- 本地：不设 `DB_ENGINE`，或 `DB_ENGINE=sqlite`
+- Docker / 生产：`DB_ENGINE=postgres`（compose 已写入）
+
+依赖：
+
+- 主路径：`backend/requirements.txt`
+- 标书分析（langchain）：`backend/requirements-legacy-bids.txt`
+
 ## 快速启动
 
 在项目根目录执行：

@@ -108,8 +108,8 @@ const checks = [
       '模型设置',
       '开始对话',
       '文件库',
-      '运行记录',
     ].every((text) => files.workbenchHome.includes(text)) &&
+      (files.workbenchHome.includes('运行记录') || files.workbenchHome.includes('任务历史')) &&
       ['.workbench-flow-grid', '.workbench-flow-card', '@media (max-width: 1120px)', '@media (max-width: 840px)']
         .every((text) => files.indexCss.includes(text)),
     hint: 'The overview should connect setup, chat, files, and delivery into one responsive product loop.',

@@ -6,6 +6,14 @@ $Frontend = Join-Path $Root "ai-skill-app"
 $HermesHome = Join-Path $Root ".hermes-runtime"
 $BackendPython = Join-Path $Backend "venv\Scripts\python.exe"
 
+# Ensure local SQLite schema is current (no-op if already applied)
+try {
+    & $BackendPython (Join-Path $Backend "manage.py") migrate --noinput | Out-Null
+} catch {
+    Write-Host "Warning: migrate failed: $($_.Exception.Message)"
+}
+
+
 function Stop-PortProcess {
     param([int]$Port)
     $connections = Get-PortListeners -Ports @($Port)

@@ -15,6 +15,8 @@ cd backend
 
 Required environment variables:
 
+- `DB_ENGINE=postgres` for production databases
+
 - `DJANGO_SETTINGS_MODULE`
 - `SECRET_KEY`
 - `JWT_SECRET_KEY`

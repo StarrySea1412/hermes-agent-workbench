@@ -15,7 +15,10 @@ admin.site.index_title = "Runtime management"
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health_view(request):
-    return Response({"status": "ok"})
+    return Response({
+        "status": "ok",
+        "legacy_bids": bool(getattr(settings, "ENABLE_LEGACY_BIDS", False)),
+    })
 
 
 urlpatterns = [
@@ -23,7 +26,6 @@ urlpatterns = [
     path("api/", include("apps.users.urls")),
     path("api/", include("apps.agents.urls")),
     path("api/", include("apps.projects.urls")),
-    path("api/", include("apps.bids.urls")),
     path("api/", include("apps.ai_config.urls")),
     path("api/health", health_view),
     path("api/", include("apps.files.urls")),
@@ -31,6 +33,9 @@ urlpatterns = [
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ]
+
+if getattr(settings, "ENABLE_LEGACY_BIDS", False):
+    urlpatterns.insert(4, path("api/", include("apps.bids.urls")))
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
