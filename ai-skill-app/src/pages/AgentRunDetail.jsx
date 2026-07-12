@@ -183,8 +183,19 @@ export default function AgentRunDetail() {
                   </div>
                 </div>
                 <div className="stack-list">
-                  <InfoRow label="模板" value={run.agent?.name || '默认运行时'} />
-                  <InfoRow label="会话" value={run.session_id || '未分配'} />
+                  <InfoRow label="来源" value={formatRunSource(run)} />
+                  <InfoRow label="模板" value={run.agent?.name || (run.source === 'chat_turn' ? '聊天运行时' : '默认运行时')} />
+                  {run.conversation_id ? (
+                    <InfoRow
+                      label="会话"
+                      value={
+                        <button type="button" className="back-link" onClick={() => navigate(`/chat/${run.conversation_id}`)}>
+                          打开会话 #{run.conversation_id}
+                        </button>
+                      }
+                    />
+                  ) : null}
+                  <InfoRow label="Hermes 会话" value={run.session_id || '未分配'} />
                   <InfoRow label="已使用工具" value={run.tools_used?.length ? run.tools_used.join(', ') : '暂无'} />
                   <InfoRow label="附加文件" value={attachedFiles.length ? String(attachedFiles.length) : '无'} />
                   <InfoRow label="步骤数" value={String(run.step_count || mergedSteps.length || 0)} />
@@ -327,6 +338,12 @@ function InfoRow({ label, value }) {
       <p>{value}</p>
     </div>
   )
+}
+
+function formatRunSource(run) {
+  if (run?.source === 'chat_turn') return '聊天回合'
+  if (run?.source === 'workflow') return '工作流（legacy）'
+  return '手动运行'
 }
 
 function formatDate(value) {

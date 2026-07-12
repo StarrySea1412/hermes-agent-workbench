@@ -51,7 +51,8 @@ export default function AgentRuns() {
         run.status,
         run.answer_preview,
         run.error,
-        run.session_id,
+        run.source,
+        run.conversation_id,
       ].some((value) => String(value || '').toLowerCase().includes(keyword))
     })
   }, [query, runs, statusFilter])
@@ -64,9 +65,9 @@ export default function AgentRuns() {
       <main className="page">
         <header className="page-header">
           <div>
-            <p className="eyebrow">运行</p>
-            <h1>执行历史</h1>
-            <p>每一次运行都会保存任务内容、步骤轨迹、工具使用记录和最终回答，方便后续回看。</p>
+            <p className="eyebrow">任务历史</p>
+            <h1>运行与会话回合</h1>
+            <p>包含手动 Agent 运行，以及聊天回合自动产生的任务记录（source=chat_turn）。</p>
           </div>
           <div className="header-actions">
             <button type="button" className="secondary-button" onClick={() => navigate('/')}>
@@ -162,7 +163,7 @@ export default function AgentRuns() {
                 <div className="runs-row-main">
                   <strong>{run.task}</strong>
                   <small>
-                    {run.agent?.name || '默认运行时'} · {formatShortDate(run.updated_at)}
+                    {formatRunSource(run)} · {formatShortDate(run.updated_at)}
                     {run.session_id ? ` · ${run.session_id}` : ''}
                   </small>
                   {run.answer_preview || run.error ? (
@@ -199,6 +200,14 @@ function formatShortDate(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
   return date.toLocaleString()
+}
+
+function formatRunSource(run) {
+  if (run?.source === 'chat_turn') {
+    return run.conversation_id ? `会话回合 #${run.conversation_id}` : '会话回合'
+  }
+  if (run?.source === 'workflow') return '工作流'
+  return run?.agent?.name || '手动运行'
 }
 
 function truncate(value, maxLength) {

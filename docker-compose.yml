@@ -46,7 +46,6 @@ services:
       - HERMES_GATEWAY_URL=http://hermes:8642/v1
       - HERMES_GATEWAY_KEY=${HERMES_API_SERVER_KEY}
       - DB_ENGINE=postgres
-      - DB_ENGINE=postgres
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
@@ -59,7 +58,7 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────────
-  # Celery Worker (异步执行章节生成任务)
+  # Celery Worker (legacy chapter generation; not required for chat)
   # ──────────────────────────────────────────────
   celery-worker:
     build:
@@ -71,7 +70,6 @@ services:
     environment:
       - HERMES_GATEWAY_URL=http://hermes:8642/v1
       - HERMES_GATEWAY_KEY=${HERMES_API_SERVER_KEY}
-      - DB_ENGINE=postgres
       - DB_ENGINE=postgres
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1

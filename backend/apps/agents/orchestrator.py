@@ -1,4 +1,3 @@
-import json
 import logging
 
 from django.db.models import Q
@@ -6,9 +5,9 @@ from django.utils import timezone
 
 from apps.agents.models import AgentArtifact, AgentMemory, AgentRun, AgentStep
 from apps.files.models import UploadedFile
-from apps.tools import registry, schemas
+from apps.tools import registry
 from services.hermes_service import HermesService
-from services.tool_call_parser import parse_tool_calls
+from services.tool_loop import run_tool_loop
 
 logger = logging.getLogger("api")
 
@@ -292,12 +291,10 @@ def run_agent_loop(run: AgentRun, hermes: HermesService, *, max_steps=None, verb
 
     history = [{"role": "user", "content": run.task}]
     allowed_tool_names = _resolve_allowed_tool_names(run)
-    native_tools = schemas.openai_tools(allowed_tool_names)
-    tools_prompt_native = bool(native_tools)
-    tools_prompt_text = schemas.prompt_tools_section(allowed_tool_names)
     memory_prompt, memory_records = _build_memory_prompt(run)
     file_prompt, attached_files = _build_file_prompt(run)
     _touch_memories(memory_records)
+    context_note = "\n\n".join(part for part in [memory_prompt, file_prompt] if part).strip()
 
     yield _emit_step(
         run,
@@ -314,151 +311,118 @@ def run_agent_loop(run: AgentRun, hermes: HermesService, *, max_steps=None, verb
     )
 
     step_order = 2
+    pending_events = []
+
+    def build_system_prompt(native_tools_enabled, tools_prompt_text):
+        return _build_system_prompt(
+            run,
+            "" if native_tools_enabled else tools_prompt_text,
+            context_note,
+        )
+
+    def on_event(event_type, payload):
+        pending_events.append((event_type, payload))
+
+    tool_context = {
+        "user": run.user,
+        "user_id": run.user_id,
+        "run_id": run.id,
+        "conversation_id": getattr(run, "conversation_id", None),
+    }
 
     try:
-        for _ in range(max_steps):
-            if _run_is_cancelled(run):
-                ensure_run_mission_artifact(run)
-                yield _emit_step(
-                    run,
-                    order=step_order,
-                    step_type="error",
-                    status="skipped",
-                    content={"message": CANCELLED_NOTICE},
-                )
-                return
+        loop_result = run_tool_loop(
+            agent=hermes,
+            history=history,
+            tool_names=allowed_tool_names,
+            build_system_prompt=build_system_prompt,
+            tool_context=tool_context,
+            max_turns=max_steps,
+            on_event=on_event,
+            should_cancel=lambda: _run_is_cancelled(run),
+        )
 
-            system_prompt = _build_system_prompt(
+        if _run_is_cancelled(run):
+            ensure_run_mission_artifact(run)
+            yield _emit_step(
                 run,
-                "" if tools_prompt_native else tools_prompt_text,
-                "\n\n".join(part for part in [memory_prompt, file_prompt] if part).strip(),
+                order=step_order,
+                step_type="error",
+                status="skipped",
+                content={"message": CANCELLED_NOTICE},
             )
+            return
 
-            try:
-                if tools_prompt_native:
-                    response = hermes.chat_with_tools(
-                        history,
-                        tools=native_tools,
-                        system_prompt=system_prompt,
-                        tool_choice="auto",
-                    )
-                else:
-                    response = hermes.chat_with_tools(history, tools=None, system_prompt=system_prompt)
-                message = response.choices[0].message
-            except Exception as exc:
-                error_text = str(exc)
-                if tools_prompt_native and ("tool" in error_text.lower() or "400" in error_text):
-                    logger.info("Falling back to prompt-based tool calls for run %s: %s", run.id, exc)
-                    tools_prompt_native = False
-                    response = hermes.chat_with_tools(
-                        history,
-                        tools=None,
-                        system_prompt=_build_system_prompt(run, tools_prompt_text, memory_prompt),
-                    )
-                    message = response.choices[0].message
-                else:
-                    raise
-
-            tool_calls, assistant_text = parse_tool_calls(message)
-
-            if _run_is_cancelled(run):
-                ensure_run_mission_artifact(run)
+        for event_type, payload in pending_events:
+            if event_type == "status":
                 yield _emit_step(
                     run,
                     order=step_order,
-                    step_type="error",
-                    status="skipped",
-                    content={"message": CANCELLED_NOTICE},
+                    step_type="plan",
+                    thought=payload.get("message") or "Tool strategy updated.",
+                    content=payload,
                 )
-                return
-
-            if not tool_calls:
-                final_answer = assistant_text or "The agent completed the run without a textual answer."
-                history.append({"role": "assistant", "content": final_answer})
-                yield _emit_step(
-                    run,
-                    order=step_order,
-                    step_type="answer",
-                    content={"answer": final_answer},
-                )
-                run.update_status_atomic(
-                    "done",
-                    answer=final_answer,
-                    completed_at=timezone.now(),
-                    tools_used=run.tools_used or [],
-                )
-                run.refresh_from_db(fields=["status", "answer", "completed_at", "tools_used", "step_count", "updated_at"])
-                ensure_run_mission_artifact(run)
-                return
-
-            for tool_call in tool_calls:
-                if _run_is_cancelled(run):
-                    ensure_run_mission_artifact(run)
-                    yield _emit_step(
-                        run,
-                        order=step_order,
-                        step_type="error",
-                        status="skipped",
-                        content={"message": CANCELLED_NOTICE},
-                    )
-                    return
-
-                name = tool_call["name"]
-                args = tool_call.get("args") or {}
-                thought = tool_call.get("thought") or ""
-
+                step_order += 1
+            elif event_type == "thought":
+                continue
+            elif event_type == "tool_call":
                 yield _emit_step(
                     run,
                     order=step_order,
                     step_type="tool_call",
-                    tool_name=name,
-                    tool_args=args,
-                    thought=thought,
+                    tool_name=payload.get("name") or "",
+                    tool_args=payload.get("args") or {},
+                    thought=payload.get("thought") or "",
                 )
                 step_order += 1
-
-                if name not in allowed_tool_names:
-                    result = {"ok": False, "error": f"Tool '{name}' is not enabled for this template."}
-                else:
-                    result = registry.execute_tool(name, args, {
-                        "user": run.user,
-                        "user_id": run.user_id,
-                        "run_id": run.id,
-                    })
-
+            elif event_type == "tool_result":
                 yield _emit_step(
                     run,
                     order=step_order,
                     step_type="tool_result",
-                    tool_name=name,
-                    tool_args=args,
-                    tool_result=result,
-                    status="ok" if result.get("ok") else "error",
+                    tool_name=payload.get("name") or "",
+                    tool_args=payload.get("args") or {},
+                    tool_result=payload.get("result"),
+                    status=payload.get("status") or "ok",
+                    thought=payload.get("thought") or "",
                 )
                 step_order += 1
-
                 tools_used = list(run.tools_used or [])
-                if name not in tools_used:
+                name = payload.get("name") or ""
+                if name and name not in tools_used:
                     tools_used.append(name)
                     AgentRun.objects.filter(id=run.id).update(tools_used=tools_used, updated_at=timezone.now())
                     run.tools_used = tools_used
 
-                result_record = json.dumps(result, ensure_ascii=False)[:4000]
-                if thought:
-                    history.append({"role": "assistant", "content": thought})
-                history.append({"role": "user", "content": f"Tool {name} result:\n{result_record}"})
+        if loop_result.exhausted:
+            notice = f"Maximum step count reached ({max_steps}) before the agent produced a final answer."
+            run.update_status_atomic("failed", error=notice, completed_at=timezone.now())
+            run.refresh_from_db(fields=["status", "error", "completed_at", "step_count", "updated_at"])
+            ensure_run_mission_artifact(run)
+            yield _emit_step(
+                run,
+                order=step_order,
+                step_type="error",
+                status="error",
+                content={"message": notice},
+            )
+            return
 
-        notice = f"Maximum step count reached ({max_steps}) before the agent produced a final answer."
-        run.update_status_atomic("failed", error=notice, completed_at=timezone.now())
-        run.refresh_from_db(fields=["status", "error", "completed_at", "step_count", "updated_at"])
-        ensure_run_mission_artifact(run)
+        final_answer = loop_result.reply or "The agent completed the run without a textual answer."
         yield _emit_step(
             run,
             order=step_order,
-            step_type="error",
-            status="error",
-            content={"message": notice},
+            step_type="answer",
+            content={"answer": final_answer},
         )
+        run.update_status_atomic(
+            "done",
+            answer=final_answer,
+            completed_at=timezone.now(),
+            tools_used=run.tools_used or list(loop_result.used_tools),
+        )
+        run.refresh_from_db(fields=["status", "answer", "completed_at", "tools_used", "step_count", "updated_at"])
+        ensure_run_mission_artifact(run)
 
     except Exception as exc:
         logger.exception("Agent run %s failed", run.id)
