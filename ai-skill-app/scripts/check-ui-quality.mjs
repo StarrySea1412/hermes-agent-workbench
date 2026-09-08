@@ -155,6 +155,14 @@ const checks = [
     hint: 'Desktop sidebar must pin to viewport height: primary nav visible, extras folded, run list scrolling internally, account pinned.',
   },
   {
+    name: 'Thinking chain renders model reasoning distinctly',
+    ok: files.messageBubble.includes('splitThinkFromContent') &&
+      files.messageBubble.includes("thought.source === 'model'") &&
+      files.messageBubble.includes('模型思考') &&
+      files.chatCss.includes('.chat-app .thought-item.model'),
+    hint: 'Model reasoning from relay think tags / reasoning_content must surface in the thought panel, separated from session steps.',
+  },
+  {
     name: 'Run detail artifacts render as delivery cards',
     ok: [
       'artifact-file-card',

@@ -4,6 +4,7 @@ export default function MessageBubble({ message, pending }) {
   const isUser = message.role === 'user'
   const toolEvents = Array.isArray(message.metadata?.tool_events) ? message.metadata.tool_events : []
   const thoughts = Array.isArray(message.metadata?.thoughts) ? message.metadata.thoughts : []
+  const { answer, inlineThink } = splitThinkFromContent(message.content)
   const sessionId = message.metadata?.session_id || ''
   const gateway = message.metadata?.gateway || ''
   const statusMessage = message.metadata?.status_message || ''
@@ -16,16 +17,22 @@ export default function MessageBubble({ message, pending }) {
       <div className="message-bubble">
         <div className="message-role">{isUser ? '你' : 'Hermes'}</div>
 
-        {!isUser && thoughts.length ? (
+        {!isUser && thoughts.length || inlineThink ? (
           <details className="thought-panel" open={pending || undefined}>
             <summary>
               <span>思考过程</span>
-              <small>{pending ? '思考中...' : `${thoughts.length} 条`}</small>
+              <small>{pending ? '思考中...' : `${thoughts.length + (inlineThink ? 1 : 0)} 条`}</small>
             </summary>
             <div className="thought-list">
+              {inlineThink ? (
+                <article className="thought-item model">
+                  <strong>模型思考</strong>
+                  <p>{inlineThink}</p>
+                </article>
+              ) : null}
               {thoughts.map((thought, index) => (
-                <article key={`${thought.title || 'step'}-${index}`} className="thought-item">
-                  <strong>{thought.title || `第 ${index + 1} 步`}</strong>
+                <article key={`${thought.title || 'step'}-${index}`} className={`thought-item ${thought.source === 'model' ? 'model' : ''}`}>
+                  <strong>{thought.source === 'model' ? '模型思考' : (thought.title || `第 ${index + 1} 步`)}</strong>
                   {thought.content ? <p>{thought.content}</p> : null}
                 </article>
               ))}
@@ -93,14 +100,32 @@ export default function MessageBubble({ message, pending }) {
         ) : null}
 
         <div className="message-content">
-          {message.content
-            ? renderMarkdownLite(message.content)
+          {answer
+            ? renderMarkdownLite(answer)
             : <span className="typing-dot">{pending ? '正在生成...' : '没有收到可显示的回复，请重试或检查模型连接。'}</span>}
           {pending ? <span className="cursor-pulse" /> : null}
         </div>
       </div>
     </article>
   )
+}
+
+function splitThinkFromContent(content) {
+  const text = String(content || '')
+  const segments = []
+  const closed = /<think(?:ing)?\s*>([\s\S]*?)<\/think(?:ing)?>/gi
+  let answer = text.replace(closed, (_m, inner) => {
+    const trimmed = inner.trim()
+    if (trimmed) segments.push(trimmed)
+    return ''
+  })
+  const unclosed = /<think(?:ing)?\s*>([\s\S]*)$/i.exec(answer)
+  if (unclosed) {
+    const trimmed = unclosed[1].trim()
+    if (trimmed) segments.push(trimmed)
+    answer = answer.slice(0, unclosed.index)
+  }
+  return { answer: answer.trim(), inlineThink: segments.join('\n\n') }
 }
 
 function ToolFileLink({ event }) {

@@ -19,6 +19,45 @@ from typing import List, Tuple
 _FENCED_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 _BARE_RE = re.compile(r'\{\s*"tool"\s*:.*?\}', re.DOTALL)
 
+# 中转站把模型思考链以 <think>/<thinking> 标签内嵌在正文里的模式
+_THINK_CLOSED_RE = re.compile(r"<think(?:ing)?\s*>\s*(.*?)\s*</think(?:ing)?>", re.DOTALL | re.IGNORECASE)
+_THINK_UNCLOSED_RE = re.compile(r"<think(?:ing)?\s*>\s*(.*)$", re.DOTALL | re.IGNORECASE)
+
+
+def extract_reasoning(message) -> str:
+    """读取中转站放在独立字段里的思考链（DeepSeek/OpenRouter 风格）。"""
+    parts = []
+    for attr in ("reasoning_content", "reasoning"):
+        value = getattr(message, attr, None)
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+    return "\n\n".join(parts)
+
+
+def split_think_tags(text: str) -> Tuple[str, str]:
+    """把正文里内嵌的 <think>/<thinking> 段落抽出来。
+
+    返回 (reasoning, cleaned_text)：正文同时保留未闭合标签的容错处理。
+    """
+    content = str(text or "")
+    reasoning_parts = []
+
+    def _collect(match):
+        inner = match.group(1).strip()
+        if inner:
+            reasoning_parts.append(inner)
+        return ""
+
+    cleaned = _THINK_CLOSED_RE.sub(_collect, content)
+    unclosed = _THINK_UNCLOSED_RE.search(cleaned)
+    if unclosed and not cleaned[:unclosed.start()].strip().endswith(">"):
+        inner = unclosed.group(1).strip()
+        if inner:
+            reasoning_parts.append(inner)
+        cleaned = cleaned[: unclosed.start()]
+
+    return "\n\n".join(reasoning_parts), cleaned.strip()
+
 
 def parse_tool_calls(message) -> Tuple[List[dict], str]:
     """message: OpenAI ChatCompletionMessage 对象 (有 .tool_calls 和 .content)。

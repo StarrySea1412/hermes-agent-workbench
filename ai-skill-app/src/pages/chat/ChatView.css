@@ -288,6 +288,14 @@
   background: #ffffff;
 }
 
+.chat-app .thought-item.model {
+  border-left-color: #c084fc;
+}
+
+.chat-app .thought-item.model strong {
+  color: #7e22ce;
+}
+
 .chat-app .thought-item strong {
   color: #1e40af;
   font-size: 12px;

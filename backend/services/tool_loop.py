@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from apps.tools import registry, schemas
-from services.tool_call_parser import parse_tool_calls
+from services.tool_call_parser import extract_reasoning, parse_tool_calls, split_think_tags
 
 logger = logging.getLogger("api")
 
@@ -110,8 +110,20 @@ def run_tool_loop(
             raise
 
         tool_calls, assistant_text = parse_tool_calls(message)
+
+        # 中转站把模型思考链放在独立字段或 <think> 标签里，统一转成思考事件
+        reasoning = extract_reasoning(message)
+        cleaned_text = assistant_text or ""
+        if not reasoning:
+            embedded, cleaned_text = split_think_tags(cleaned_text)
+            reasoning = embedded
+        if reasoning:
+            thought = {"title": f"模型思考（第 {turn_index + 1} 轮）", "content": reasoning, "source": "model"}
+            result.thoughts.append(thought)
+            emit("thought", thought)
+
         if not tool_calls:
-            result.reply = assistant_text or ""
+            result.reply = cleaned_text or ""
             if result.reply:
                 history.append({"role": "assistant", "content": result.reply})
             return result
