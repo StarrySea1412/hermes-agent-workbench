@@ -78,7 +78,7 @@ export default function TemplateEditor({ template, tools = [], onSaved, onDelete
         <input
           value={form.skill}
           onChange={(event) => setForm((current) => ({ ...current, skill: event.target.value }))}
-          placeholder="可选的本地技能路径，例如 bid-writing/chapter-planner"
+          placeholder="可选的本地技能路径，例如 research/source-review"
         />
       </label>
 

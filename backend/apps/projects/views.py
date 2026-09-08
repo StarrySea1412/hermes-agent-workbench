@@ -210,11 +210,29 @@ def conversation_stream(request, conversation_id):
                     reply = data.get("reply", "")
                     metadata = data.get("metadata", {})
                     assistant_message = service.save_assistant_message(conversation, reply, metadata=metadata)
+                    agent_run_id = metadata.get("agent_run_id")
+                    if agent_run_id:
+                        try:
+                            from apps.agents.models import AgentRun
+
+                            AgentRun.objects.filter(
+                                id=agent_run_id,
+                                user=request.user,
+                            ).update(message=assistant_message)
+                        except Exception:
+                            logger.exception(
+                                "Failed to link AgentRun message: conversation_id=%s run_id=%s",
+                                conversation.id,
+                                agent_run_id,
+                            )
                     service.sync_project_from_reply(conversation, reply)
                     payload = {
                         "message_id": assistant_message.id,
                         "reply": reply,
-                        "metadata": metadata,
+                        "metadata": {
+                            **metadata,
+                            "message_id": assistant_message.id,
+                        },
                     }
                     yield _sse("done", payload)
                     continue

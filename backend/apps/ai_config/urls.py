@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.urls import path
 
 from apps.ai_config import monitor_views, views
@@ -12,9 +11,3 @@ urlpatterns = [
     path('hermes/skills/<path:skill_path>', views.hermes_skill_detail),
     path('hermes/monitor', monitor_views.hermes_monitor),
 ]
-
-if getattr(settings, 'ENABLE_LEGACY_BIDS', False):
-    urlpatterns += [
-        path('ai-generate/chapter', views.generate_chapter),
-        path('ai-generate/status/<int:task_id>', views.generation_status),
-    ]

@@ -8,51 +8,29 @@ from django.utils import timezone
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient, APITestCase
 
-from apps.agents.models import Agent, AgentArtifact, AgentMemory, AgentRun, AgentStep, MultiAgentWorkflow
+from apps.agents.models import Agent, AgentArtifact, AgentMemory, AgentRun, AgentStep
 from apps.agents.skill_loader import get_skill_details, list_skills, load_skill_text, skill_exists
-from apps.agents.workflows import create_bid_workflow
-from apps.bids.models import Bid, BidChapter, BidStep
 from apps.files.models import UploadedFile
 from apps.tools.handlers import doc_export, web_search
 from apps.users.authentication import create_access_token
 from apps.users.models import User
-from services.hermes_service import HermesService
 
 
 class SkillLoaderTests(SimpleTestCase):
-    def test_project_skill_can_be_loaded_from_repo_root(self):
-        self.assertTrue(skill_exists("bid-writing/bid-chapter-writer"))
-        text = load_skill_text("bid-writing/bid-chapter-writer")
-        self.assertIsNotNone(text)
-        self.assertIn("Bid Chapter Writer", text)
-
     def test_generic_agent_engineering_skills_are_available(self):
         self.assertTrue(skill_exists("agent-engineering/general-operator"))
         self.assertTrue(skill_exists("agent-engineering/research-scout"))
         self.assertTrue(skill_exists("agent-engineering/artifact-builder"))
 
+        text = load_skill_text("agent-engineering/general-operator")
+        self.assertIsNotNone(text)
+        self.assertIn("General Operator", text)
+
     def test_skill_listing_returns_metadata(self):
-        details = get_skill_details("bid-writing/bid-chapter-writer")
+        details = get_skill_details("agent-engineering/general-operator")
         self.assertIsNotNone(details)
-        self.assertEqual(details["path"], "bid-writing/bid-chapter-writer")
+        self.assertEqual(details["path"], "agent-engineering/general-operator")
         self.assertTrue(any(skill["path"] == details["path"] for skill in list_skills()))
-
-
-class HermesServiceTests(SimpleTestCase):
-    @patch("services.hermes_service.OpenAI")
-    def test_generate_chapter_passes_system_prompt(self, mock_openai):
-        mock_openai.return_value = MagicMock()
-        service = HermesService(session_id="session-1")
-        service.chat = MagicMock(return_value="done")
-
-        service.generate_chapter(
-            chapter_title="Overview",
-            prompt="Focus on delivery",
-            system_prompt="skill prompt",
-        )
-
-        service.chat.assert_called_once()
-        self.assertEqual(service.chat.call_args.kwargs["system_prompt"], "skill prompt")
 
 
 class ToolHandlerTests(SimpleTestCase):
@@ -62,259 +40,6 @@ class ToolHandlerTests(SimpleTestCase):
 
         self.assertFalse(result["ok"])
         self.assertIn("No web search provider is configured", result["error"])
-
-
-@override_settings(
-    LOCAL_SINGLE_USER_MODE=False,
-    JWT_SECRET_KEY="test-jwt-secret-key-with-32-bytes!!",
-)
-class BidWorkflowBlueprintTests(APITestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="workflow-owner", password="password123")
-        self.bid = Bid.objects.create(
-            title="City Data Platform Bid",
-            user=self.user,
-            status="draft",
-            completed_chapters=0,
-            total_chapters=2,
-        )
-        self.chapter_a = BidChapter.objects.create(bid=self.bid, title="Executive Summary", order=0)
-        self.chapter_a_child = BidChapter.objects.create(
-            bid=self.bid,
-            parent=self.chapter_a,
-            title="Executive Summary Appendix",
-            order=1,
-        )
-        self.chapter_b = BidChapter.objects.create(bid=self.bid, title="Implementation Plan", order=2)
-        BidStep.objects.create(bid=self.bid, order=0, label="Analyze", status="completed")
-        BidStep.objects.create(bid=self.bid, order=1, label="Draft", status="pending")
-
-    def test_create_bid_workflow_creates_default_blueprint(self):
-        workflow = create_bid_workflow(
-            bid=self.bid,
-            user=self.user,
-            objective="Prepare a compliant multi-agent draft",
-        )
-        workflow.refresh_from_db()
-
-        self.assertEqual(MultiAgentWorkflow.objects.count(), 1)
-        self.assertEqual(
-            Agent.objects.filter(
-                slug__in=[
-                    "tender-analyzer",
-                    "chapter-planner",
-                    "chapter-writer",
-                    "compliance-reviewer",
-                ]
-            ).count(),
-            4,
-        )
-        self.assertEqual(workflow.objective, "Prepare a compliant multi-agent draft")
-        self.assertEqual(workflow.node_count, 5)
-        self.assertEqual(workflow.metadata["chapter_count"], 2)
-        self.assertFalse(workflow.metadata["include_child_chapters"])
-
-        self.assertEqual(
-            list(workflow.nodes.order_by("order").values_list("key", flat=True)),
-            [
-                "analyzer",
-                "planner",
-                f"writer-{self.chapter_a.id}",
-                f"writer-{self.chapter_b.id}",
-                "reviewer",
-            ],
-        )
-
-        reviewer = workflow.nodes.get(key="reviewer")
-        self.assertEqual(reviewer.depends_on, [f"writer-{self.chapter_a.id}", f"writer-{self.chapter_b.id}"])
-
-        writer_node = workflow.nodes.get(key=f"writer-{self.chapter_a.id}")
-        self.assertEqual(writer_node.metadata["chapter_title"], "Executive Summary")
-        self.assertEqual(writer_node.input_artifacts, ["bid_snapshot", "chapter_plan", "requirements_report"])
-
-        self.assertCountEqual(
-            workflow.artifacts.values_list("key", flat=True),
-            ["bid_snapshot", "reference_files"],
-        )
-        snapshot = workflow.artifacts.get(key="bid_snapshot")
-        self.assertEqual(
-            [chapter["id"] for chapter in snapshot.payload["chapters"]],
-            [self.chapter_a.id, self.chapter_b.id],
-        )
-
-    def test_create_bid_workflow_can_include_child_chapters(self):
-        workflow = create_bid_workflow(
-            bid=self.bid,
-            user=self.user,
-            include_child_chapters=True,
-        )
-        workflow.refresh_from_db()
-
-        self.assertEqual(workflow.node_count, 6)
-        self.assertEqual(workflow.metadata["chapter_count"], 3)
-        self.assertTrue(workflow.metadata["include_child_chapters"])
-        self.assertTrue(workflow.nodes.filter(key=f"writer-{self.chapter_a_child.id}").exists())
-
-
-@override_settings(
-    LOCAL_SINGLE_USER_MODE=False,
-    JWT_SECRET_KEY="test-jwt-secret-key-with-32-bytes!!",
-)
-class MultiAgentWorkflowApiTests(APITestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="bid-user", password="password123")
-        self.other_user = User.objects.create_user(username="other-user", password="password123")
-        self.client = self._make_client(self.user)
-        self.other_client = self._make_client(self.other_user)
-        self.bid = Bid.objects.create(title="Metro Operations Bid", user=self.user, total_chapters=1)
-        self.chapter = BidChapter.objects.create(bid=self.bid, title="Delivery Plan", order=0)
-        BidStep.objects.create(bid=self.bid, order=0, label="Analyze", status="completed")
-
-    def _make_client(self, user):
-        client = APIClient()
-        client.credentials(HTTP_AUTHORIZATION=f"Bearer {create_access_token(user.id)}")
-        return client
-
-    def test_create_multi_agent_workflow_returns_detail_payload(self):
-        response = self.client.post(
-            f"/api/bids/{self.bid.id}/multi-agent/workflows",
-            {"objective": "Draft and review this bid"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(MultiAgentWorkflow.objects.count(), 1)
-        self.assertEqual(response.data["kind"], "bid_pipeline")
-        self.assertEqual(response.data["objective"], "Draft and review this bid")
-        self.assertEqual(response.data["node_count"], 4)
-        self.assertEqual(len(response.data["nodes"]), 4)
-        self.assertCountEqual(
-            [node["key"] for node in response.data["nodes"]],
-            ["analyzer", "planner", f"writer-{self.chapter.id}", "reviewer"],
-        )
-        self.assertCountEqual(
-            [artifact["key"] for artifact in response.data["artifacts"]],
-            ["bid_snapshot", "reference_files"],
-        )
-
-    def test_workflow_endpoints_are_scoped_to_bid_owner(self):
-        workflow = create_bid_workflow(bid=self.bid, user=self.user)
-
-        list_response = self.client.get(f"/api/bids/{self.bid.id}/multi-agent/workflows")
-        self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(len(list_response.data), 1)
-        self.assertEqual(list_response.data[0]["id"], workflow.id)
-
-        detail_response = self.client.get(f"/api/bids/{self.bid.id}/multi-agent/workflows/{workflow.id}")
-        self.assertEqual(detail_response.status_code, 200)
-        self.assertEqual(detail_response.data["id"], workflow.id)
-
-        other_list_response = self.other_client.get(f"/api/bids/{self.bid.id}/multi-agent/workflows")
-        self.assertEqual(other_list_response.status_code, 404)
-
-        other_detail_response = self.other_client.get(f"/api/bids/{self.bid.id}/multi-agent/workflows/{workflow.id}")
-        self.assertEqual(other_detail_response.status_code, 404)
-
-    def test_execute_workflow_runs_nodes_and_persists_outputs(self):
-        workflow = create_bid_workflow(bid=self.bid, user=self.user)
-
-        class DummyHermes:
-            def __init__(self, *args, **kwargs):
-                self.session_id = kwargs.get("session_id")
-
-            def health_check(self):
-                return {"connected": True}
-
-        def fake_run_loop(run, _hermes, max_steps=None):
-            del max_steps
-            if run.agent and run.agent.slug == "tender-analyzer":
-                answer = "## Requirements\n- Provide the delivery plan.\n- Show implementation risks."
-            elif run.agent and run.agent.slug == "chapter-planner":
-                answer = "## Chapter Plan\n- Delivery Plan: address scope, schedule, and controls."
-            elif run.agent and run.agent.slug == "chapter-writer":
-                answer = "# Delivery Plan\n\nWe will deliver the work in phased milestones."
-            else:
-                answer = "## Review Report\n- Draft is aligned with the requirements."
-
-            AgentStep.objects.create(
-                run=run,
-                order=1,
-                type="answer",
-                status="ok",
-                content={"answer": answer},
-            )
-            run.update_status_atomic(
-                "done",
-                answer=answer,
-                completed_at=timezone.now(),
-                step_count=1,
-                tools_used=[],
-            )
-            run.refresh_from_db()
-            yield {"order": 1, "type": "answer", "status": "ok", "content": {"answer": answer}}
-
-        with patch("apps.agents.views.HermesService", DummyHermes), patch(
-            "apps.agents.workflows.executor.HermesService",
-            DummyHermes,
-        ), patch("apps.agents.workflows.executor.run_agent_loop", side_effect=fake_run_loop):
-            response = self.client.post(
-                f"/api/bids/{self.bid.id}/multi-agent/workflows/{workflow.id}/execute",
-            )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["status"], "done")
-        self.assertEqual(response.data["completed_nodes"], 4)
-        self.assertTrue(all(node["status"] == "done" for node in response.data["nodes"]))
-        self.assertTrue(all(node["agent_run_id"] for node in response.data["nodes"]))
-        self.assertCountEqual(
-            [artifact["key"] for artifact in response.data["artifacts"]],
-            [
-                "bid_snapshot",
-                "reference_files",
-                "requirements_report",
-                "chapter_plan",
-                f"chapter-draft-{self.chapter.id}",
-                "review_report",
-            ],
-        )
-
-        self.bid.refresh_from_db()
-        self.chapter.refresh_from_db()
-        self.assertEqual(self.bid.status, "active")
-        self.assertEqual(self.bid.completed_chapters, 1)
-        self.assertTrue(self.chapter.content)
-
-    def test_cancel_workflow_cancels_active_agent_run(self):
-        workflow = create_bid_workflow(bid=self.bid, user=self.user)
-        running_node = workflow.nodes.order_by("order").first()
-        agent_run = AgentRun.objects.create(
-            user=self.user,
-            agent=running_node.agent,
-            task="In-flight node run",
-            status="running",
-            max_steps=4,
-            session_id=f"u{self.user.id}-wf{workflow.id}-{running_node.key}",
-            started_at=timezone.now(),
-        )
-        workflow.status = "running"
-        workflow.current_node_key = running_node.key
-        workflow.started_at = timezone.now()
-        workflow.save(update_fields=["status", "current_node_key", "started_at", "updated_at"])
-        running_node.status = "running"
-        running_node.agent_run = agent_run
-        running_node.started_at = timezone.now()
-        running_node.save(update_fields=["status", "agent_run", "started_at", "updated_at"])
-
-        response = self.client.post(
-            f"/api/bids/{self.bid.id}/multi-agent/workflows/{workflow.id}/cancel",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["status"], "cancelled")
-        running_node.refresh_from_db()
-        agent_run.refresh_from_db()
-        self.assertEqual(running_node.status, "cancelled")
-        self.assertEqual(agent_run.status, "cancelled")
 
 
 @override_settings(

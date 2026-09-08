@@ -89,22 +89,6 @@ class HermesService:
             if delta:
                 yield delta
 
-    def generate_chapter(
-        self,
-        chapter_title: str,
-        prompt: Optional[str] = None,
-        context: Optional[str] = None,
-        timeout: int = 120,
-        system_prompt: Optional[str] = None,
-    ) -> str:
-        del timeout
-        user_prompt = f"Write content for this chapter: {chapter_title}"
-        if prompt:
-            user_prompt += f"\n\nExtra requirements:\n{prompt}"
-        if context:
-            user_prompt += f"\n\nReference context:\n{context}"
-        return self.chat([{"role": "user", "content": user_prompt}], system_prompt=system_prompt)
-
     def analyze_document(self, file_content: str, timeout: int = 180) -> Dict[str, Any]:
         del timeout
         prompt = f"""Analyze the following source material for an engineering agent project.
@@ -123,12 +107,6 @@ Source:
             return {"available": True, "connected": bool(content), "error": None, "latency_ms": latency_ms}
         except Exception as exc:
             return {"available": False, "connected": False, "error": str(exc)}
-
-    def to_canvas_format(self, text: str) -> list:
-        from services.text_utils import text_to_canvas_format
-
-        return text_to_canvas_format(text)
-
 
 def create_hermes_service(config=None, session_id: Optional[str] = None):
     try:

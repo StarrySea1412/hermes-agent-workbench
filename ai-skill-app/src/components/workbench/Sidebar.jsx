@@ -1,7 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import RunStatusBadge from './RunStatusBadge'
 import { useHermesMonitor } from '../../hooks/useAIConfig'
-import { ENABLE_LEGACY_BIDS } from '../../config/features'
 
 export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false }) {
   const navigate = useNavigate()
@@ -51,11 +50,6 @@ export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false
         <NavLink to="/memories" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           记忆
         </NavLink>
-        {ENABLE_LEGACY_BIDS ? (
-          <NavLink to="/workflows" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-            工作流（旧）
-          </NavLink>
-        ) : null}
       </nav>
 
       <section className="sidebar-panel">

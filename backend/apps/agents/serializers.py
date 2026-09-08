@@ -7,9 +7,6 @@ from apps.agents.models import (
     AgentMemory,
     AgentRun,
     AgentStep,
-    MultiAgentWorkflow,
-    WorkflowArtifact,
-    WorkflowNodeRun,
 )
 from apps.files.models import UploadedFile
 from apps.files.serializers import UploadedFileSerializer
@@ -319,78 +316,3 @@ class AgentRunDetailSerializer(AgentRunListSerializer):
         files_by_id = {uploaded.id: uploaded for uploaded in queryset}
         ordered = [files_by_id[file_id] for file_id in file_ids if file_id in files_by_id]
         return UploadedFileSerializer(ordered, many=True, context=self.context).data
-
-
-class CreateMultiAgentWorkflowSerializer(serializers.Serializer):
-    objective = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    include_child_chapters = serializers.BooleanField(required=False, default=False)
-
-
-class WorkflowArtifactSerializer(serializers.ModelSerializer):
-    node_id = serializers.IntegerField(source="node.id", read_only=True)
-
-    class Meta:
-        model = WorkflowArtifact
-        fields = ["id", "node_id", "key", "title", "artifact_type", "payload", "created_at", "updated_at"]
-
-
-class WorkflowNodeRunSerializer(serializers.ModelSerializer):
-    agent_slug = serializers.SerializerMethodField()
-
-    class Meta:
-        model = WorkflowNodeRun
-        fields = [
-            "id",
-            "agent_id",
-            "agent_slug",
-            "agent_run_id",
-            "chapter_id",
-            "key",
-            "label",
-            "node_type",
-            "status",
-            "order",
-            "depends_on",
-            "input_artifacts",
-            "output_artifacts",
-            "summary",
-            "error",
-            "metadata",
-            "created_at",
-            "updated_at",
-            "started_at",
-            "completed_at",
-        ]
-
-    def get_agent_slug(self, obj):
-        return obj.agent.slug if obj.agent_id and obj.agent else None
-
-
-class MultiAgentWorkflowListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MultiAgentWorkflow
-        fields = [
-            "id",
-            "bid_id",
-            "kind",
-            "title",
-            "objective",
-            "status",
-            "current_node_key",
-            "node_count",
-            "completed_nodes",
-            "error",
-            "metadata",
-            "created_at",
-            "updated_at",
-            "started_at",
-            "completed_at",
-        ]
-
-
-class MultiAgentWorkflowDetailSerializer(MultiAgentWorkflowListSerializer):
-    nodes = WorkflowNodeRunSerializer(many=True, read_only=True)
-    artifacts = WorkflowArtifactSerializer(many=True, read_only=True)
-
-    class Meta(MultiAgentWorkflowListSerializer.Meta):
-        fields = MultiAgentWorkflowListSerializer.Meta.fields + ["nodes", "artifacts"]

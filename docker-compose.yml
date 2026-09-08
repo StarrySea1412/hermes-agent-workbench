@@ -46,49 +46,12 @@ services:
       - HERMES_GATEWAY_URL=http://hermes:8642/v1
       - HERMES_GATEWAY_KEY=${HERMES_API_SERVER_KEY}
       - DB_ENGINE=postgres
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
       - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
       - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-*}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
     depends_on:
       - postgres
-      - redis
-    restart: unless-stopped
-
-  # ──────────────────────────────────────────────
-  # Celery Worker (legacy chapter generation; not required for chat)
-  # ──────────────────────────────────────────────
-  celery-worker:
-    build:
-      context: ./backend
-      dockerfile: ../docker/backend.Dockerfile
-    env_file:
-      - ./backend/.env
-      - ./backend/.env.docker
-    environment:
-      - HERMES_GATEWAY_URL=http://hermes:8642/v1
-      - HERMES_GATEWAY_KEY=${HERMES_API_SERVER_KEY}
-      - DB_ENGINE=postgres
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
-      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-*}
-    depends_on:
-      - postgres
-      - redis
-      - hermes
-    # --concurrency: 同时执行的任务数（建议 ≤ Hermes MAX_CONCURRENT_RUNS）
-    # --max-tasks-per-child: 防 worker 内存泄漏定期重启
-    command: [
-      "celery", "-A", "ai_skill_project", "worker",
-      "--loglevel=info",
-      "--concurrency=4",
-      "--max-tasks-per-child=50",
-      "--without-gossip", "--without-mingle", "--without-heartbeat"
-    ]
     restart: unless-stopped
 
   # ──────────────────────────────────────────────
@@ -110,21 +73,6 @@ services:
       retries: 5
 
   # ──────────────────────────────────────────────
-  # Redis (Celery 消息队列 + 结果后端)
-  # ──────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  # ──────────────────────────────────────────────
   # Hermes Agent Gateway (OpenAI 兼容 API)
   # ──────────────────────────────────────────────
   hermes:
@@ -133,7 +81,7 @@ services:
     restart: unless-stopped
     volumes:
       - hermes-data:/opt/data
-      - ./hermes_skills:/opt/data/skills:ro    # Hermes skills (agent-engineering + optional bid-writing)
+      - ./hermes_skills:/opt/data/skills:ro    # Hermes skills
     environment:
       - API_SERVER_ENABLED=true
       - API_SERVER_HOST=0.0.0.0
@@ -166,5 +114,4 @@ services:
 
 volumes:
   pgdata:
-  redisdata:
   hermes-data:

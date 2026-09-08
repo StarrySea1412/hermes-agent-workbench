@@ -342,7 +342,6 @@ function InfoRow({ label, value }) {
 
 function formatRunSource(run) {
   if (run?.source === 'chat_turn') return '聊天回合'
-  if (run?.source === 'workflow') return '工作流（legacy）'
   return '手动运行'
 }
 

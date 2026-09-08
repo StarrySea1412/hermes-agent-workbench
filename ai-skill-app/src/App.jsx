@@ -16,8 +16,6 @@ import Settings from './pages/Settings'
 import SkillsCatalog from './pages/SkillsCatalog'
 import ToolRegistry from './pages/ToolRegistry'
 import WorkbenchHome from './pages/WorkbenchHome'
-import { ENABLE_LEGACY_BIDS } from './config/features'
-import WorkflowLab from './pages/WorkflowLab'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, isLoading, error } = useAuth()
@@ -62,9 +60,6 @@ export default function App() {
         <Route path="/agent" element={<ProtectedRoute><WorkbenchHome /></ProtectedRoute>} />
         <Route path="/runs" element={<ProtectedRoute><AgentRuns /></ProtectedRoute>} />
         <Route path="/runs/:runId" element={<ProtectedRoute><AgentRunDetail /></ProtectedRoute>} />
-        {ENABLE_LEGACY_BIDS ? (
-          <Route path="/workflows" element={<ProtectedRoute><WorkflowLab /></ProtectedRoute>} />
-        ) : null}
         <Route path="/templates" element={<ProtectedRoute><AgentTemplates /></ProtectedRoute>} />
         <Route path="/tools" element={<ProtectedRoute><ToolRegistry /></ProtectedRoute>} />
         <Route path="/files" element={<ProtectedRoute><FilesWorkbench /></ProtectedRoute>} />

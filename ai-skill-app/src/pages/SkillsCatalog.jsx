@@ -4,17 +4,12 @@ import { listAgentTemplates, listAgentRuns } from '../api/agents'
 import Sidebar from '../components/workbench/Sidebar'
 import { useHermesSkillDetail, useHermesSkills } from '../hooks/useAIConfig'
 import { useAuth } from '../hooks/useAuth'
-import { ENABLE_LEGACY_BIDS } from '../config/features'
 
 export default function SkillsCatalog() {
   const { user, logout, isLocalMode } = useAuth()
   const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const { data: templates = [] } = useQuery({ queryKey: ['agentTemplates'], queryFn: listAgentTemplates })
-  const { data: rawSkills = [] } = useHermesSkills()
-  const skills = useMemo(() => {
-    if (ENABLE_LEGACY_BIDS) return rawSkills
-    return rawSkills.filter((skill) => !String(skill.path || '').startsWith('bid-writing/'))
-  }, [rawSkills])
+  const { data: skills = [] } = useHermesSkills()
   const [requestedSkillPath, setRequestedSkillPath] = useState('')
   const selectedSkillPath = skills.some((skill) => skill.path === requestedSkillPath)
     ? requestedSkillPath
@@ -75,7 +70,7 @@ export default function SkillsCatalog() {
                 >
                   <div className="template-card-top">
                     <strong>{skill.title || skill.name}</strong>
-                    <small>{String(skill.path || '').startsWith('bid-writing/') ? 'legacy · ' : ''}{skill.source}</small>
+                    <small>{skill.source}</small>
                   </div>
                   <p>{skill.description || '技能元数据中没有提供描述。'}</p>
                   <code>{skill.path}</code>

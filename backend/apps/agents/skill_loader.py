@@ -57,7 +57,7 @@ def skill_exists(skill_path: str) -> bool:
 
 
 def load_skill_text(skill_path: str) -> Optional[str]:
-    """skill_path like ``bid-writing/bid-chapter-writer`` without suffix."""
+    """Resolve a skill path such as ``agent-engineering/general-operator``."""
     skill_file = resolve_skill_file(skill_path)
     if not skill_file:
         return None

@@ -68,4 +68,3 @@ The Settings page and `/api/hermes/monitor` endpoint can verify connectivity.
 ## 6. Notes
 
 - `web_search` uses Brave Search when `BRAVE_SEARCH_API_KEY` is set, otherwise SerpAPI when `SERPAPI_API_KEY` is set.
-- The bid workflow endpoints remain deployable, but the main product surface is the generic agent workbench.

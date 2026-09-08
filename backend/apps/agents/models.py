@@ -94,7 +94,6 @@ class AgentRun(models.Model):
         help_text="Hermes session key used across the run.",
         verbose_name="Session ID",
     )
-    celery_task_id = models.CharField(max_length=128, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -119,7 +118,7 @@ class AgentRun(models.Model):
         max_length=32,
         default="manual",
         db_index=True,
-        help_text="chat_turn | manual | workflow",
+        help_text="chat_turn | manual",
         verbose_name="Source",
     )
 
@@ -259,149 +258,3 @@ class AgentMemory(models.Model):
 
     def __str__(self):
         return f"Memory#{self.id} {self.scope} {self.title}"
-
-
-class MultiAgentWorkflow(models.Model):
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("running", "Running"),
-        ("done", "Done"),
-        ("failed", "Failed"),
-        ("cancelled", "Cancelled"),
-    ]
-
-    KIND_CHOICES = [
-        ("bid_pipeline", "Bid pipeline"),
-    ]
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="multi_agent_workflows",
-    )
-    bid = models.ForeignKey(
-        "bids.Bid",
-        on_delete=models.CASCADE,
-        related_name="multi_agent_workflows",
-    )
-    kind = models.CharField(max_length=32, choices=KIND_CHOICES, default="bid_pipeline", db_index=True)
-    title = models.CharField(max_length=256, default="")
-    objective = models.TextField(blank=True, default="")
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending", db_index=True)
-    current_node_key = models.CharField(max_length=64, blank=True, default="")
-    error = models.TextField(blank=True, default="")
-    metadata = models.JSONField(default=dict, blank=True)
-    node_count = models.IntegerField(default=0)
-    completed_nodes = models.IntegerField(default=0)
-    celery_task_id = models.CharField(max_length=128, blank=True, default="")
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    started_at = models.DateTimeField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "multi_agent_workflows"
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Workflow#{self.id} [{self.status}] {self.title or self.bid_id}"
-
-    def update_status_atomic(self, status, **fields):
-        from django.db import transaction
-
-        update_fields = {"status": status, "updated_at": timezone.now()}
-        update_fields.update(fields)
-        with transaction.atomic():
-            return MultiAgentWorkflow.objects.filter(
-                id=self.id,
-                status__in=["pending", "running"],
-            ).update(**update_fields)
-
-
-class WorkflowNodeRun(models.Model):
-    STATUS_CHOICES = MultiAgentWorkflow.STATUS_CHOICES
-    NODE_TYPE_CHOICES = [
-        ("analysis", "Analysis"),
-        ("planning", "Planning"),
-        ("writing", "Writing"),
-        ("review", "Review"),
-    ]
-
-    workflow = models.ForeignKey(
-        MultiAgentWorkflow,
-        on_delete=models.CASCADE,
-        related_name="nodes",
-    )
-    agent = models.ForeignKey(
-        Agent,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="workflow_nodes",
-    )
-    chapter = models.ForeignKey(
-        "bids.BidChapter",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="workflow_nodes",
-    )
-    agent_run = models.ForeignKey(
-        AgentRun,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="workflow_nodes",
-    )
-    key = models.CharField(max_length=64)
-    label = models.CharField(max_length=128)
-    node_type = models.CharField(max_length=16, choices=NODE_TYPE_CHOICES)
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending", db_index=True)
-    order = models.IntegerField(default=0)
-    depends_on = models.JSONField(default=list, blank=True)
-    input_artifacts = models.JSONField(default=list, blank=True)
-    output_artifacts = models.JSONField(default=list, blank=True)
-    summary = models.TextField(blank=True, default="")
-    error = models.TextField(blank=True, default="")
-    metadata = models.JSONField(default=dict, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    started_at = models.DateTimeField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "workflow_node_runs"
-        ordering = ["order", "id"]
-        unique_together = ("workflow", "key")
-
-    def __str__(self):
-        return f"Node#{self.id} {self.key} [{self.status}]"
-
-
-class WorkflowArtifact(models.Model):
-    workflow = models.ForeignKey(
-        MultiAgentWorkflow,
-        on_delete=models.CASCADE,
-        related_name="artifacts",
-    )
-    node = models.ForeignKey(
-        WorkflowNodeRun,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="artifacts",
-    )
-    key = models.CharField(max_length=64)
-    title = models.CharField(max_length=128, default="")
-    artifact_type = models.CharField(max_length=32, default="json")
-    payload = models.JSONField(default=dict, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "workflow_artifacts"
-        ordering = ["created_at", "id"]
-        unique_together = ("workflow", "key")
-
-    def __str__(self):
-        return f"Artifact#{self.id} {self.key}"

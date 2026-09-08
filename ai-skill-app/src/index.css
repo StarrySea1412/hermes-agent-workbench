@@ -538,8 +538,7 @@ select:focus-visible {
 .memory-catalog,
 .tool-card-grid,
 .file-catalog,
-.file-inline-list,
-.workflow-node-grid {
+.file-inline-list {
   display: grid;
   gap: 12px;
 }
@@ -1105,46 +1104,6 @@ select:focus-visible {
 .tool-card-section {
   display: grid;
   gap: 4px;
-}
-
-.chapter-tree,
-.chapter-children {
-  display: grid;
-  gap: 10px;
-}
-
-.chapter-item {
-  padding-left: calc(var(--depth, 0) * 16px);
-}
-
-.chapter-item-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-soft);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.chapter-item-row.selected {
-  border-color: var(--primary);
-  background: rgba(79, 70, 229, 0.08);
-}
-
-.chapter-item-row strong,
-.chapter-item-row small {
-  display: block;
-}
-
-.chapter-item-row small {
-  color: var(--muted);
 }
 
 .stream-dot {

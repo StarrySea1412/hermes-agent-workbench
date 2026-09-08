@@ -1,19 +1,17 @@
 import logging
 
-from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.agents.skill_loader import get_skill_document, list_skills, skill_exists
-from apps.ai_config.models import AIConfig, GenerationTask
+from apps.agents.skill_loader import get_skill_document, list_skills
+from apps.ai_config.models import AIConfig
 from apps.ai_config.serializers import (
     AIConfigCreateSerializer,
     AIModelListRequestSerializer,
     AIConfigSerializer,
     AIConfigUpdateSerializer,
-    AIGenerateRequestSerializer,
 )
 from services.encryption_service import get_encryption
 from services.hermes_config_sync import sync_hermes_config_for_user
@@ -173,109 +171,6 @@ def _model_fetch_hint(exc):
     if "failed to fetch" in message:
         return "后端无法连接模型列表接口，请检查网络、TLS 证书、代理或上游地址。"
     return "请检查基础 URL、API Key、模型列表接口兼容性以及上游访问限制。"
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def generate_chapter(request):
-    serializer = AIGenerateRequestSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-
-    mode = data.get("mode", "fast")
-    skill = (data.get("skill") or "").strip()
-
-    from apps.bids.models import BidChapter
-
-    chapter = get_object_or_404(BidChapter.objects.filter(bid__user=request.user), id=data["chapter_id"])
-
-    if mode == "fast":
-        if not AIConfig.objects.filter(user=request.user, is_active=True).exists():
-            return Response({"message": "Configure AI settings first."}, status=status.HTTP_400_BAD_REQUEST)
-    elif mode == "hermes":
-        if skill and not skill_exists(skill):
-            return Response({"message": f"Hermes skill not found: {skill}"}, status=status.HTTP_400_BAD_REQUEST)
-
-        from services.hermes_service import create_hermes_service
-
-        if not create_hermes_service():
-            return Response(
-                {
-                    "message": "Hermes Agent Gateway is unavailable. Check the runtime before retrying.",
-                    "fallback": True,
-                },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-    running = GenerationTask.objects.filter(
-        user=request.user,
-        status__in=["pending", "running"],
-    ).first()
-    if running:
-        return Response(
-            {
-                "message": "Another generation task is already running for this user.",
-                "existing_task_id": running.id,
-            },
-            status=status.HTTP_429_TOO_MANY_REQUESTS,
-        )
-
-    gen_task = GenerationTask.objects.create(
-        user=request.user,
-        chapter=chapter,
-        mode=mode,
-        status="pending",
-        prompt=data.get("prompt") or "",
-        context=data.get("context") or "",
-        skill=skill,
-    )
-
-    from apps.ai_config.tasks import generate_chapter_task
-
-    async_result = generate_chapter_task.delay(gen_task.id)
-    gen_task.celery_task_id = async_result.id
-    gen_task.save(update_fields=["celery_task_id"])
-
-    return Response(
-        {
-            "task_id": gen_task.id,
-            "status": gen_task.status,
-            "mode": mode,
-            "skill": gen_task.skill or None,
-            "message": "Task submitted. Poll the status endpoint for progress.",
-        },
-        status=status.HTTP_202_ACCEPTED,
-    )
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def generation_status(request, task_id):
-    try:
-        gen_task = GenerationTask.objects.get(id=task_id, user=request.user)
-    except GenerationTask.DoesNotExist:
-        return Response({"message": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    response = {
-        "task_id": gen_task.id,
-        "status": gen_task.status,
-        "mode": gen_task.mode,
-        "skill": gen_task.skill or None,
-    }
-    if gen_task.status == "done":
-        result = gen_task.result or {}
-        response["content"] = result.get("content")
-        response["generated_text"] = result.get("generated_text")
-    elif gen_task.status == "failed":
-        response["error"] = gen_task.error
-        response["message"] = f"Generation failed: {gen_task.error}" if gen_task.error else "Generation failed."
-    else:
-        response["message"] = {
-            "pending": "Queued.",
-            "running": "Running.",
-        }.get(gen_task.status, "")
-
-    return Response(response)
 
 
 @api_view(["GET"])

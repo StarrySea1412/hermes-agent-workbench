@@ -4,7 +4,7 @@ from django.conf import settings
 
 from services.encryption_service import get_encryption
 from services.model_fetch_service import MODEL_FETCH_USER_AGENT, normalize_openai_base_url
-from services.text_utils import normalize_messages, text_to_canvas_format
+from services.text_utils import normalize_messages
 
 ANTHROPIC_PROVIDERS = {"anthropic"}
 
@@ -12,11 +12,6 @@ DEFAULT_CONTENT_SYSTEM_PROMPT = """You are Hermes Workbench, an AI delivery assi
 Help the user turn rough notes, files, and goals into clear outlines, plans, reports, specs, speaker notes, and export-ready content.
 Prefer structured Markdown. When useful, include a section named "Suggested outline" with concise bullets.
 Ask at most one focused question only when required; otherwise make a reasonable assumption and continue."""
-
-BID_COMPAT_SYSTEM_PROMPT = """You are a professional document writing assistant.
-Generate structured, specific, polished content for the requested chapter.
-Use clear headings and avoid empty boilerplate."""
-
 
 class _CompatMessage:
     def __init__(self, content="", tool_calls=None):
@@ -75,19 +70,6 @@ class AIService:
             max_retries=settings.AI_MAX_RETRIES,
         )
         self._use_openai = False
-
-    def generate_chapter_content(self, chapter_title, prompt=None, context=None):
-        user_prompt = f"Write content for this chapter: {chapter_title}"
-        if prompt:
-            user_prompt += f"\n\nExtra requirements:\n{prompt}"
-        if context:
-            user_prompt += f"\n\nReference context:\n{context}"
-
-        generated_text = self.generate_content(
-            [{"role": "user", "content": user_prompt}],
-            system_prompt=BID_COMPAT_SYSTEM_PROMPT,
-        )
-        return generated_text, text_to_canvas_format(generated_text)
 
     def generate_content(self, messages, system_prompt=None, context=None):
         system_prompt = system_prompt or DEFAULT_CONTENT_SYSTEM_PROMPT

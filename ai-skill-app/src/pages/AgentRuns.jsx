@@ -206,7 +206,6 @@ function formatRunSource(run) {
   if (run?.source === 'chat_turn') {
     return run.conversation_id ? `会话回合 #${run.conversation_id}` : '会话回合'
   }
-  if (run?.source === 'workflow') return '工作流'
   return run?.agent?.name || '手动运行'
 }
 

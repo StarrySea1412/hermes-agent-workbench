@@ -5,8 +5,6 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from apps.bids.models import Bid
-from apps.bids.serializers import BidOutlineSerializer
 from apps.users.authentication import create_access_token
 from apps.users.models import User
 from apps.users.serializers import RegisterSerializer, UserSerializer
@@ -67,16 +65,6 @@ def register_view(request):
 @permission_classes([IsAuthenticated])
 def me_view(request):
     serializer = UserSerializer(request.user)
-    return Response(serializer.data)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def user_bids_view(request, user_id):
-    if request.user.id != user_id:
-        return Response({"message": "你不能访问其他用户的项目。"}, status=status.HTTP_403_FORBIDDEN)
-    bids = Bid.objects.filter(user=request.user).order_by("-updated_at")
-    serializer = BidOutlineSerializer(bids, many=True)
     return Response(serializer.data)
 
 

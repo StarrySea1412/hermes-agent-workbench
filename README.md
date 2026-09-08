@@ -19,22 +19,12 @@ AI-skill 是一个本地优先的 Hermes Agent 工作台。当前主路径是：
 4. 观察工具调用与任务历史（`/runs`）
 5. 下载导出产物
 
-标书 / multi-agent 工作流已降级为 **legacy**，默认关闭：
-
-- 后端：`ENABLE_LEGACY_BIDS=true`
-- 前端：`VITE_ENABLE_LEGACY_BIDS=true`
-
 ## 本地数据库
 
 默认使用 **SQLite**（`backend/db.sqlite3`），无需本机 PostgreSQL。
 
 - 本地：不设 `DB_ENGINE`，或 `DB_ENGINE=sqlite`
 - Docker / 生产：`DB_ENGINE=postgres`（compose 已写入）
-
-依赖：
-
-- 主路径：`backend/requirements.txt`
-- 标书分析（langchain）：`backend/requirements-legacy-bids.txt`
 
 ## 快速启动
 
@@ -109,7 +99,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\verify-ai-skill.ps1 -CheckService
 - `/projects/:projectId`：工作空间详情、资料上传、导出
 - `/settings`：模型配置、Hermes 状态、技能检查
 - `/skills`：本地 Hermes skills
-- `/agent`、`/runs`、`/workflows`：实验性 Agent/工作流页面
+- `/agent`、`/runs`、`/runs/:runId`：实验性 Agent 页面与任务历史
 
 ## 本地账号
 

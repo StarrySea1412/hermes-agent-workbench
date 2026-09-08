@@ -38,16 +38,3 @@ class AIModelListRequestSerializer(serializers.Serializer):
     is_full_url = serializers.BooleanField(required=False, default=False)
     models_url = serializers.CharField(max_length=512, required=False, allow_blank=True)
     user_agent = serializers.CharField(max_length=256, required=False, allow_blank=True)
-
-
-class AIGenerateRequestSerializer(serializers.Serializer):
-    chapter_id = serializers.IntegerField()
-    prompt = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    context = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    skill = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=128)
-    mode = serializers.ChoiceField(choices=['fast', 'hermes'], default='fast')
-
-
-class BidAnalyzeRequestSerializer(serializers.Serializer):
-    file_path = serializers.CharField()
-    mode = serializers.ChoiceField(choices=['fast', 'hermes'], default='fast')

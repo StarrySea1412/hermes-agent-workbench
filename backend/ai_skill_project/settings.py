@@ -57,7 +57,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'apps.users',
     'apps.projects',
-    'apps.bids',
+    'apps.bids',  # Migration-only tombstone for removed bid tables.
     'apps.ai_config',
     'apps.logs',
     'apps.files',
@@ -215,9 +215,6 @@ if not DEBUG and JWT_SECRET_KEY == 'dev-secret-key-please-change-in-production':
         stacklevel=1,
     )
 
-# Bids / multi-agent workflows are legacy and off by default.
-ENABLE_LEGACY_BIDS = os.getenv('ENABLE_LEGACY_BIDS', 'False').lower() in ('true', '1', 'yes')
-
 # ──────────────────────────────────────────────
 # AI 配置
 # ──────────────────────────────────────────────
@@ -236,36 +233,6 @@ AI_DEFAULT_MODEL = os.environ.get('AI_DEFAULT_MODEL', '')
 
 HERMES_GATEWAY_URL = os.getenv('HERMES_GATEWAY_URL', 'http://localhost:8642/v1')
 HERMES_GATEWAY_KEY = os.getenv('HERMES_GATEWAY_KEY', '')
-
-# ──────────────────────────────────────────────
-# Celery / Redis 配置（异步生成任务）
-# ──────────────────────────────────────────────
-
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
-CELERY_TIMEZONE = TIME_ZONE
-
-# 任务序列化统一用 json
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_ACCEPT_CONTENT = ['json']
-
-# 单个生成任务的超时与重试
-CELERY_TASK_TIME_LIMIT = 300       # 硬超时 5 分钟（含 Hermes reasoning + LLM 往返）
-CELERY_TASK_SOFT_TIME_LIMIT = 270  # 软超时 4.5 分钟，触发前抛 SoftTimeLimitExceeded
-CELERY_TASK_REJECT_ON_WORKER_LOST = True  # worker 崩溃时任务重新入队，不丢失
-
-# 稳妥的可见性超时（避免长任务被重复分发）
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-
-CELERY_TASK_ALWAYS_EAGER = os.getenv(
-    'CELERY_TASK_ALWAYS_EAGER',
-    'true' if DEBUG else 'false',
-).lower() in ('true', '1', 'yes')
-CELERY_TASK_EAGER_PROPAGATES = True
-if CELERY_TASK_ALWAYS_EAGER and not os.getenv('CELERY_BROKER_URL'):
-    CELERY_BROKER_URL = 'memory://'
-    CELERY_RESULT_BACKEND = 'cache+memory://'
 
 # ──────────────────────────────────────────────
 # 日志

@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
-from apps.agents.models import Agent, AgentArtifact, AgentMemory, AgentRun, MultiAgentWorkflow
+from apps.agents.models import Agent, AgentArtifact, AgentMemory, AgentRun
 from apps.agents.orchestrator import (
     DEFAULT_MAX_STEPS,
     ensure_run_mission_artifact,
@@ -28,13 +28,8 @@ from apps.agents.serializers import (
     AgentSerializer,
     AgentUpsertSerializer,
     CreateAgentRunSerializer,
-    CreateMultiAgentWorkflowSerializer,
-    MultiAgentWorkflowDetailSerializer,
-    MultiAgentWorkflowListSerializer,
     SaveRunMemorySerializer,
 )
-from apps.agents.workflows import WORKFLOW_CANCELLED_NOTICE, create_bid_workflow, execute_workflow
-from apps.bids.models import Bid
 from apps.files.models import UploadedFile
 from apps.tools import schemas
 from services.hermes_service import HermesService
@@ -67,10 +62,6 @@ DEFAULT_AGENT_TEMPLATES = [
 ]
 
 
-def _get_user_bid_or_404(request, bid_id):
-    return get_object_or_404(Bid.objects.filter(user=request.user), id=bid_id)
-
-
 def _ensure_default_agents():
     for payload in DEFAULT_AGENT_TEMPLATES:
         agent, created = Agent.objects.get_or_create(
@@ -101,17 +92,6 @@ def _get_user_run_or_404(request, run_id):
     return get_object_or_404(
         AgentRun.objects.select_related("agent").prefetch_related("steps", "artifacts").filter(user=request.user),
         id=run_id,
-    )
-
-
-def _get_user_workflow_or_404(request, bid_id, workflow_id):
-    _get_user_bid_or_404(request, bid_id)
-    return get_object_or_404(
-        MultiAgentWorkflow.objects.select_related("bid").prefetch_related("nodes__agent", "nodes__chapter", "artifacts").filter(
-            user=request.user,
-            bid_id=bid_id,
-        ),
-        id=workflow_id,
     )
 
 
@@ -152,7 +132,7 @@ def _validate_file_ids(user, file_ids):
     return normalized
 
 
-def _build_legacy_run_artifacts(run):
+def _build_run_artifacts(run):
     attached_files = [{
         "id": uploaded.id,
         "original_name": uploaded.original_name,
@@ -407,7 +387,7 @@ def agent_run_artifacts(request, run_id):
     artifacts = list(run.artifacts.all())
     if artifacts:
         return Response(AgentArtifactSerializer(artifacts, many=True).data)
-    return Response(AgentRunArtifactSerializer(_build_legacy_run_artifacts(run), many=True).data)
+    return Response(AgentRunArtifactSerializer(_build_run_artifacts(run), many=True).data)
 
 
 @api_view(["GET"])
@@ -513,92 +493,6 @@ def execute_agent_run_stream(request, run_id):
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
     return response
-
-
-@api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
-def bid_multi_agent_workflows(request, bid_id):
-    bid = _get_user_bid_or_404(request, bid_id)
-
-    if request.method == "GET":
-        workflows = bid.multi_agent_workflows.order_by("-created_at")
-        return Response(MultiAgentWorkflowListSerializer(workflows, many=True).data)
-
-    serializer = CreateMultiAgentWorkflowSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    workflow = create_bid_workflow(
-        bid=bid,
-        user=request.user,
-        objective=serializer.validated_data.get("objective") or "",
-        include_child_chapters=serializer.validated_data.get("include_child_chapters", False),
-    )
-    return Response(MultiAgentWorkflowDetailSerializer(workflow).data, status=status.HTTP_201_CREATED)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def bid_multi_agent_workflow_detail(request, bid_id, workflow_id):
-    workflow = _get_user_workflow_or_404(request, bid_id, workflow_id)
-    return Response(MultiAgentWorkflowDetailSerializer(workflow).data)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def execute_bid_multi_agent_workflow(request, bid_id, workflow_id):
-    workflow = _get_user_workflow_or_404(request, bid_id, workflow_id)
-
-    if workflow.status == "running":
-        return Response(
-            {"message": "工作流已经在执行中。"},
-            status=status.HTTP_409_CONFLICT,
-        )
-
-    if workflow.status in {"done", "failed", "cancelled"}:
-        return Response(
-            {"message": f"当前工作流状态已是 {workflow.status}。如需再次执行，请新建一个工作流蓝图。"},
-            status=status.HTTP_409_CONFLICT,
-        )
-
-    health = HermesService(session_id=f"u{request.user.id}-wf{workflow.id}").health_check()
-    if not health.get("connected"):
-        return Response(
-            {"message": health.get("error") or "Hermes 网关当前不可用。"},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
-
-    execute_workflow(workflow)
-    workflow = _get_user_workflow_or_404(request, bid_id, workflow_id)
-    return Response(MultiAgentWorkflowDetailSerializer(workflow).data)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def cancel_bid_multi_agent_workflow(request, bid_id, workflow_id):
-    workflow = _get_user_workflow_or_404(request, bid_id, workflow_id)
-
-    if workflow.status == "cancelled":
-        return Response(MultiAgentWorkflowDetailSerializer(workflow).data)
-
-    if workflow.status not in {"pending", "running"}:
-        return Response(
-            {"message": f"当前工作流状态为 {workflow.status}，无法取消。"},
-            status=status.HTTP_409_CONFLICT,
-        )
-
-    active_node = workflow.nodes.filter(status="running").select_related("agent_run").order_by("order", "id").first()
-    if active_node and active_node.agent_run_id:
-        active_node.agent_run.update_status_atomic("cancelled", completed_at=timezone.now())
-        active_node.agent_run.refresh_from_db()
-        ensure_run_mission_artifact(active_node.agent_run)
-        active_node.status = "cancelled"
-        active_node.error = WORKFLOW_CANCELLED_NOTICE
-        active_node.completed_at = timezone.now()
-        active_node.save(update_fields=["status", "error", "completed_at", "updated_at"])
-
-    workflow.update_status_atomic("cancelled", completed_at=timezone.now(), error=WORKFLOW_CANCELLED_NOTICE)
-    workflow.refresh_from_db()
-    workflow = _get_user_workflow_or_404(request, bid_id, workflow_id)
-    return Response(MultiAgentWorkflowDetailSerializer(workflow).data)
 
 
 def _sse(event, data):

@@ -33,6 +33,7 @@ dist/
 dist-ssr/
 ai-skill-app/dist/
 ai-skill-app/dist-lib/
+ai-skill-app/dist-codex-verify/
 
 # ── IDE / 工具残留 ───────────────────────
 .vscode/

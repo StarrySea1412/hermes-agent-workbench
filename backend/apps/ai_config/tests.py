@@ -1,5 +1,4 @@
 from io import StringIO
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from cryptography.fernet import Fernet
@@ -7,8 +6,7 @@ from django.core.management import call_command
 from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APIClient, APITestCase
 
-from apps.ai_config.models import AIConfig, GenerationTask
-from apps.bids.models import Bid, BidChapter
+from apps.ai_config.models import AIConfig
 from apps.users.authentication import create_access_token
 from apps.users.models import User
 from services import encryption_service
@@ -72,37 +70,11 @@ class ModelFetchServiceTests(SimpleTestCase):
     LOCAL_SINGLE_USER_MODE=False,
     JWT_SECRET_KEY='test-jwt-secret-key-with-32-bytes!!',
 )
-class GenerationTaskSecurityTests(APITestCase):
-    def setUp(self):
-        self.owner = User.objects.create_user(username='owner', password='password123')
-        self.other_user = User.objects.create_user(username='other', password='password123')
-        self.client = APIClient()
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {create_access_token(self.other_user.id)}')
-        self.bid = Bid.objects.create(title='Owner Bid', user=self.owner, total_chapters=1)
-        self.chapter = BidChapter.objects.create(bid=self.bid, title='Secret Chapter', order=0)
-
-    def test_generate_chapter_cannot_target_another_users_chapter(self):
-        response = self.client.post(
-            '/api/ai-generate/chapter',
-            {'chapter_id': self.chapter.id, 'mode': 'fast'},
-            format='json',
-        )
-
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(GenerationTask.objects.count(), 0)
-
-
-@override_settings(
-    LOCAL_SINGLE_USER_MODE=False,
-    JWT_SECRET_KEY='test-jwt-secret-key-with-32-bytes!!',
-)
 class HermesSkillApiTests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='writer', password='password123')
+        self.user = User.objects.create_user(username='operator', password='password123')
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {create_access_token(self.user.id)}')
-        self.bid = Bid.objects.create(title='Bid', user=self.user, total_chapters=1)
-        self.chapter = BidChapter.objects.create(bid=self.bid, title='Implementation Plan', order=0)
 
     def test_list_hermes_skills(self):
         response = self.client.get('/api/hermes/skills')
@@ -110,7 +82,7 @@ class HermesSkillApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('skills', response.data)
         self.assertTrue(
-            any(skill['path'] == 'bid-writing/bid-chapter-writer' for skill in response.data['skills'])
+            any(skill['path'] == 'agent-engineering/general-operator' for skill in response.data['skills'])
         )
 
     def test_get_hermes_skill_detail(self):
@@ -127,38 +99,6 @@ class HermesSkillApiTests(APITestCase):
         response = self.client.get('/api/hermes/skills/manual/not-found')
 
         self.assertEqual(response.status_code, 404)
-
-    def test_generate_chapter_rejects_unknown_hermes_skill(self):
-        response = self.client.post(
-            '/api/ai-generate/chapter',
-            {
-                'chapter_id': self.chapter.id,
-                'mode': 'hermes',
-                'skill': 'manual/not-found',
-            },
-            format='json',
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(GenerationTask.objects.count(), 0)
-
-    @patch('apps.ai_config.tasks.generate_chapter_task.delay', return_value=SimpleNamespace(id='task-1'))
-    @patch('services.hermes_service.create_hermes_service', return_value=object())
-    def test_generate_chapter_persists_requested_skill(self, _mock_hermes, _mock_delay):
-        response = self.client.post(
-            '/api/ai-generate/chapter',
-            {
-                'chapter_id': self.chapter.id,
-                'mode': 'hermes',
-                'skill': 'bid-writing/bid-chapter-writer',
-            },
-            format='json',
-        )
-
-        self.assertEqual(response.status_code, 202)
-        task = GenerationTask.objects.get()
-        self.assertEqual(task.skill, 'bid-writing/bid-chapter-writer')
-        self.assertEqual(response.data['skill'], 'bid-writing/bid-chapter-writer')
 
 
 @override_settings(

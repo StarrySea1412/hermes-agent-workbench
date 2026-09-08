@@ -5,7 +5,6 @@ This directory stores project-local Hermes skill files.
 ## Current groups
 
 - `agent-engineering/` for generic workbench skills
-- `bid-writing/` for the bid workflow extension
 
 ## Skill format
 
@@ -36,10 +35,3 @@ Skill instructions...
 - `agent-engineering/general-operator`
 - `agent-engineering/research-scout`
 - `agent-engineering/artifact-builder`
-
-## Domain-specific examples
-
-- `bid-writing/tender-analyzer`
-- `bid-writing/chapter-planner`
-- `bid-writing/bid-chapter-writer`
-- `bid-writing/compliance-reviewer`

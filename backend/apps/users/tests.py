@@ -5,8 +5,6 @@ from django.test import override_settings
 from rest_framework.test import APIClient, APITestCase
 
 from apps.logs.models import RequestLog
-from apps.bids.models import Bid
-from apps.users.authentication import create_access_token
 from apps.users.models import User
 
 
@@ -27,24 +25,6 @@ class LoginLoggingTests(APITestCase):
         self.assertEqual(log_entry.request_body['password'], '******')
         self.assertEqual(log_entry.response_body['access_token'], '******')
         self.assertEqual(log_entry.response_body['token_type'], 'bearer')
-
-
-@override_settings(
-    LOCAL_SINGLE_USER_MODE=False,
-    JWT_SECRET_KEY='test-jwt-secret-key-with-32-bytes!!',
-)
-class UserBidAccessTests(APITestCase):
-    def setUp(self):
-        self.owner = User.objects.create_user(username='owner', password='password123')
-        self.other_user = User.objects.create_user(username='other', password='password123')
-        self.bid = Bid.objects.create(title='Owner Bid', user=self.owner, total_chapters=0)
-        self.client = APIClient()
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {create_access_token(self.other_user.id)}')
-
-    def test_user_bid_route_forbids_access_to_other_users(self):
-        response = self.client.get(f'/api/users/{self.owner.id}/bids')
-
-        self.assertEqual(response.status_code, 403)
 
 
 @override_settings(
