@@ -205,3 +205,56 @@ class SyncAIConfigCommandTests(APITestCase):
 
         self.assertEqual(AIConfig.objects.count(), 0)
         self.assertIn('Skipped AI config sync', stdout.getvalue())
+
+
+class HermesConfigSyncLoopGuardTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='sync-user', password='password123')
+        encryption = get_encryption()
+        self.config = AIConfig.objects.create(
+            user=self.user,
+            provider='openai',
+            base_url='https://api.example.com/v1',
+            model_name='test-model',
+            api_key_encrypted=encryption.encrypt('sk-test'),
+            temperature=0.7,
+            max_tokens=4000,
+            is_active=True,
+        )
+
+    @patch('services.hermes_config_sync.load_existing_config', return_value={})
+    @patch('services.hermes_config_sync.get_hermes_config_path')
+    def test_sync_writes_config_for_normal_upstream(self, mock_path, _mock_existing):
+        import tempfile as tempfile_module
+        from pathlib import Path as FsPath
+
+        with tempfile_module.TemporaryDirectory() as tmpdir:
+            mock_path.return_value = FsPath(tmpdir) / 'config.yaml'
+            from services.hermes_config_sync import sync_hermes_config_for_user
+
+            result = sync_hermes_config_for_user(self.user)
+
+            self.assertTrue(result['ok'])
+            self.assertTrue(mock_path.return_value.exists())
+
+    @patch('services.hermes_config_sync.load_existing_config', return_value={})
+    @patch('services.hermes_config_sync._gateway_self_urls')
+    @patch('services.hermes_config_sync.get_hermes_config_path')
+    def test_sync_refuses_gateway_self_reference(self, mock_path, mock_self_urls, _mock_existing):
+        import tempfile as tempfile_module
+        from pathlib import Path as FsPath
+
+        mock_self_urls.return_value = {'http://127.0.0.1:8642/v1'}
+        with tempfile_module.TemporaryDirectory() as tmpdir:
+            config_path = FsPath(tmpdir) / 'config.yaml'
+            mock_path.return_value = config_path
+            self.config.base_url = 'http://127.0.0.1:8642/v1'
+            self.config.save()
+
+            from services.hermes_config_sync import sync_hermes_config_for_user
+
+            result = sync_hermes_config_for_user(self.user)
+
+            self.assertFalse(result['ok'])
+            self.assertEqual(result['reason'], 'gateway_self_reference')
+            self.assertFalse(config_path.exists())

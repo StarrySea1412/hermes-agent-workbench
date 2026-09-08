@@ -28,6 +28,7 @@ export default function ChatView() {
   const [isSending, setIsSending] = useState(false)
   const [notice, setNotice] = useState('')
   const [copyState, setCopyState] = useState('')
+  const [runtimeOpen, setRuntimeOpen] = useState(false)
   const { data: aiConfig } = useAIConfig()
 
   const { data: conversations = [] } = useQuery({
@@ -323,15 +324,11 @@ export default function ChatView() {
           <div className="chat-title-block">
             <p className="eyebrow">Hermes</p>
             <h1>{conversation?.title || '今天要推进什么？'}</h1>
-            <p className="chat-subtitle">{workspace.goal}</p>
-            <div className="chat-runtime-bar">
-              <span className="runtime-chip">{runtime.gatewayLabel}</span>
-              <span className="runtime-chip">{runtime.sessionId ? `会话 ${runtime.sessionId}` : '未分配会话'}</span>
-              <span className="runtime-chip">{runtime.fileCount} 份资料</span>
-              <span className="runtime-chip">{runtime.toolCount} 次工具动作</span>
-            </div>
           </div>
           <div className="chat-header-actions">
+            <button type="button" className="ghost-button" onClick={() => setRuntimeOpen((open) => !open)}>
+              {runtimeOpen ? '收起状态' : '运行设置'}
+            </button>
             {convId ? (
               <button
                 type="button"
@@ -355,7 +352,7 @@ export default function ChatView() {
           workspace={workspace}
           runtime={runtime}
           onOpenProjects={() => navigate('/projects')}
-          onOpenSettings={() => navigate('/settings')}
+          onOpenSettings={() => setRuntimeOpen(true)}
           onOpenSkills={() => navigate('/skills')}
         />
 
@@ -390,11 +387,21 @@ export default function ChatView() {
 
             <ChatInput disabled={isSending} onSend={handleSend} onFiles={handleFiles} />
           </section>
-
-          <aside className="delivery-rail" aria-label="Agent 运行状态">
-            <InsightPanel project={conversation?.project} runtime={runtime} />
-          </aside>
         </div>
+
+        <button
+          type="button"
+          className={`rail-backdrop ${runtimeOpen ? 'open' : ''}`}
+          aria-label="关闭运行设置"
+          onClick={() => setRuntimeOpen(false)}
+        />
+        <aside className={`delivery-rail ${runtimeOpen ? 'open' : ''}`} aria-label="Agent 运行状态" aria-hidden={!runtimeOpen}>
+          <div className="rail-head">
+            <span>运行设置</span>
+            <button type="button" className="rail-close" onClick={() => setRuntimeOpen(false)}>×</button>
+          </div>
+          <InsightPanel project={conversation?.project} runtime={runtime} />
+        </aside>
       </main>
     </div>
   )
@@ -431,10 +438,7 @@ function TaskOverview({ workspace, runtime, onOpenProjects, onOpenSettings, onOp
   return (
     <section className="task-overview" aria-label="任务总览">
       <div className="task-overview-head">
-        <div>
-          <p className="eyebrow">任务总览</p>
-          <h2>{workspace.phaseLabel}</h2>
-        </div>
+        <h2>{workspace.phaseLabel}</h2>
         <div className="task-progress" aria-label={`任务阶段：${workspace.phaseLabel}`}>
           {workspace.phases.map((phase) => (
             <span
@@ -450,7 +454,6 @@ function TaskOverview({ workspace, runtime, onOpenProjects, onOpenSettings, onOp
           <article key={card.label} className="task-card">
             <span>{card.label}</span>
             <strong>{card.value}</strong>
-            <p>{card.helper}</p>
             {card.action ? (
               <button type="button" className="task-card-action" onClick={card.action.onClick}>
                 {card.action.label}

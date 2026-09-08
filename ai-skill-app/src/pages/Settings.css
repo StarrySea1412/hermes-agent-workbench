@@ -52,6 +52,46 @@
   overflow-wrap: anywhere;
 }
 
+.remote-model-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.remote-model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--text, #1f2937);
+  background: var(--surface, #ffffff);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-model-chip:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft, #edf5ff);
+}
+
+.remote-model-chip.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-soft, #edf5ff);
+}
+
+.remote-model-chip:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 @media (max-width: 640px) {
   .panel-alert-header {
     display: grid;

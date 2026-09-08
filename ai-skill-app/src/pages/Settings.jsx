@@ -245,6 +245,32 @@ export default function Settings() {
     }
   }
 
+  const remoteModelIds = remoteModels
+    .map((model) => (typeof model === 'string' ? model : model?.id))
+    .filter(Boolean)
+
+  const applyModel = async (modelName) => {
+    if (!existingConfig && !(formData.api_key || '').trim()) {
+      setNotice({ ok: false, text: '启用模型前请先填写 API Key。' })
+      return
+    }
+    const payload = { ...formData, model_name: modelName }
+    if (existingConfig && !payload.api_key) {
+      delete payload.api_key
+    }
+    try {
+      if (existingConfig) {
+        await updateMutation.mutateAsync(payload)
+      } else {
+        await createMutation.mutateAsync(payload)
+      }
+      setEdits({})
+      setNotice({ ok: true, text: `已启用模型：${modelName}` })
+    } catch (error) {
+      setNotice({ ok: false, text: `启用模型失败：${error.message}` })
+    }
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setNotice(null)
@@ -399,6 +425,27 @@ export default function Settings() {
                   placeholder={currentProvider.defaultUrl || '输入 API 基础地址'}
                 />
               </label>
+
+              {remoteModelIds.length ? (
+                <div className="field">
+                  <span>可用模型（点击立即启用）</span>
+                  <div className="remote-model-grid">
+                    {remoteModelIds.map((model) => (
+                      <button
+                        key={model}
+                        type="button"
+                        className={`remote-model-chip ${formData.model_name === model ? 'active' : ''}`}
+                        disabled={isSaving}
+                        onClick={() => applyModel(model)}
+                      >
+                        {model}
+                        {formData.model_name === model ? ' ✓' : ''}
+                      </button>
+                    ))}
+                  </div>
+                  <small className="inline-hint">点击模型会立即保存为当前活动配置；保存后可用“测试连接”验证聊天可用性。</small>
+                </div>
+              ) : null}
 
               <div className="panel-header">
                 <div>

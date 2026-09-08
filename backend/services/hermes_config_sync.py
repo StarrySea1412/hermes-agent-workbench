@@ -18,6 +18,22 @@ DEFAULT_SKILL_PATHS = [
 ]
 ANTHROPIC_PROVIDERS = {"anthropic"}
 
+
+def _gateway_self_urls():
+    urls = set()
+    raw = (os.getenv("HERMES_GATEWAY_URL") or "").strip()
+    if raw:
+        urls.add(_normalize_url_host(raw))
+    port = (os.getenv("HERMES_GATEWAY_PORT") or "8642").strip()
+    for host in ("127.0.0.1", "localhost"):
+        urls.add(_normalize_url_host(f"http://{host}:{port}/v1"))
+    return urls
+
+
+def _normalize_url_host(url):
+    text = (url or "").strip().rstrip("/")
+    return text.replace("://localhost", "://127.0.0.1", 1).lower()
+
 PROVIDER_MAP = {
     "openai": "openai-api",
     "anthropic": "anthropic",
@@ -86,6 +102,19 @@ def sync_hermes_config_for_user(user):
     base_url = raw_base_url
     if (config.provider or "").lower() not in ANTHROPIC_PROVIDERS:
         base_url = normalize_openai_base_url(raw_base_url)
+
+    if base_url and _normalize_url_host(base_url) in _gateway_self_urls():
+        logger.warning(
+            "Refusing Hermes config sync for user_id=%s: base_url points at the local gateway (%s), which would loop.",
+            user.id,
+            base_url,
+        )
+        return {
+            "ok": False,
+            "reason": "gateway_self_reference",
+            "message": "模型地址指向本机 Hermes 网关，网关会把请求发给自己形成死循环，已跳过同步。",
+        }
+
     hermes_config["model"] = {
         "provider": map_provider_to_hermes(config.provider, base_url),
         "default": config.model_name,

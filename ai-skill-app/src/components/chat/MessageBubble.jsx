@@ -3,6 +3,7 @@ import { resolveFileUrl } from '../../api/files'
 export default function MessageBubble({ message, pending }) {
   const isUser = message.role === 'user'
   const toolEvents = Array.isArray(message.metadata?.tool_events) ? message.metadata.tool_events : []
+  const thoughts = Array.isArray(message.metadata?.thoughts) ? message.metadata.thoughts : []
   const sessionId = message.metadata?.session_id || ''
   const gateway = message.metadata?.gateway || ''
   const statusMessage = message.metadata?.status_message || ''
@@ -14,6 +15,23 @@ export default function MessageBubble({ message, pending }) {
       <div className="message-avatar">{isUser ? '你' : 'H'}</div>
       <div className="message-bubble">
         <div className="message-role">{isUser ? '你' : 'Hermes'}</div>
+
+        {!isUser && thoughts.length ? (
+          <details className="thought-panel" open={pending || undefined}>
+            <summary>
+              <span>思考过程</span>
+              <small>{pending ? '思考中...' : `${thoughts.length} 条`}</small>
+            </summary>
+            <div className="thought-list">
+              {thoughts.map((thought, index) => (
+                <article key={`${thought.title || 'step'}-${index}`} className="thought-item">
+                  <strong>{thought.title || `第 ${index + 1} 步`}</strong>
+                  {thought.content ? <p>{thought.content}</p> : null}
+                </article>
+              ))}
+            </div>
+          </details>
+        ) : null}
 
         {!isUser && (sessionId || gateway || statusMessage) ? (
           <div className="message-runtime">
