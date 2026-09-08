@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listAgentRuns, listAgentTools } from '../api/agents'
+import { listAgentRuns } from '../api/agents'
 import Sidebar from '../components/workbench/Sidebar'
 import { useAuth } from '../hooks/useAuth'
 import {
@@ -150,10 +150,9 @@ async function copyText(text) {
 export default function Settings() {
   const { user, logout, isLocalMode } = useAuth()
   const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
-  const { data: tools = [] } = useQuery({ queryKey: ['agentTools'], queryFn: listAgentTools })
   const { data: existingConfig, isLoading } = useAIConfig()
   const { data: hermesMonitor, isFetching: isMonitorFetching, refetch: refetchHermes } = useHermesMonitor()
-  const { data: hermesSkills = [], isFetching: isSkillsFetching, refetch: refetchSkills } = useHermesSkills()
+  const { data: hermesSkills = [] } = useHermesSkills()
   const createMutation = useCreateAIConfig()
   const updateMutation = useUpdateAIConfig()
   const testMutation = useTestAIConfig()
@@ -182,7 +181,6 @@ export default function Settings() {
   const selectedModelOption = modelOptions.includes(formData.model_name) ? formData.model_name : CUSTOM_MODEL_VALUE
   const isSaving = createMutation.isPending || updateMutation.isPending
   const connected = Boolean(hermesMonitor?.connected)
-  const enabledTools = tools.filter((tool) => tool.registered).length
 
   const saveConfig = async () => {
     const payload = { ...formData }
@@ -328,6 +326,16 @@ export default function Settings() {
   }
 
   const ccProviders = ccSwitch?.providers || []
+  const [ccQuery, setCcQuery] = useState('')
+  const filteredCcProviders = ccProviders.filter((provider) => {
+    const keyword = ccQuery.trim().toLowerCase()
+    if (!keyword) return true
+    return (
+      provider.name.toLowerCase().includes(keyword) ||
+      provider.base_url.toLowerCase().includes(keyword) ||
+      (provider.model_name || '').toLowerCase().includes(keyword)
+    )
+  })
   const handleImportCcProvider = async (provider) => {
     setNotice({ ok: true, text: `正在导入「${provider.name}」...` })
     try {
@@ -364,67 +372,15 @@ export default function Settings() {
           </div>
         </header>
 
-        <section className="metric-grid">
-          <MetricCard label="提供方" value={formData.provider || '未设置'} helper={formData.model_name || '尚未选择模型。'} />
-          <MetricCard label="Hermes" value={connected ? '在线' : '离线'} helper={hermesMonitor?.gateway_url || '网关尚未配置。'} />
-          <MetricCard label="技能" value={String(hermesSkills.length)} helper="后端发现的本地技能文件数量。" />
-          <MetricCard label="工具" value={String(enabledTools)} helper="模板可调用的已注册运行时工具。" />
-        </section>
-
-        <div className="content-grid detail-grid">
+        <div className="content-grid detail-grid settings-layout">
           <section className="panel">
             <form className="template-editor" onSubmit={handleSubmit}>
               <div className="panel-header">
                 <div>
-                  <p className="eyebrow">模型端点</p>
+                  <p className="eyebrow">模型接入</p>
                   <h2>提供方配置</h2>
+                  <p className="panel-subtext">当前：{formData.model_name || '尚未选择模型'} · {formData.base_url || '未填写接口地址'}</p>
                 </div>
-              </div>
-
-              <div className="cc-import-panel">
-                <div className="cc-import-head">
-                  <div>
-                    <h3>从 CC Switch 导入</h3>
-                    <small className="inline-hint">
-                      {ccSwitch?.found
-                        ? `已发现本机 CC Switch 中的 ${ccProviders.length} 个供应商，点击即可导入启用。`
-                        : '未检测到 CC Switch 配置（~/.cc-switch），可手动填写下方表单。'}
-                    </small>
-                  </div>
-                </div>
-                {ccSwitch?.found ? (
-                  <div className="cc-import-list">
-                    {ccProviders.map((provider) => (
-                      <article
-                        key={provider.id}
-                        className={`cc-import-row ${formData.base_url === provider.base_url ? 'active' : ''}`}
-                      >
-                        <div className="cc-import-info">
-                          <strong>{provider.name}</strong>
-                          <code>{provider.base_url}</code>
-                          <small>
-                            {provider.app_type === 'claude' ? 'Claude 协议' : 'OpenAI 兼容'}
-                            {provider.model_name ? ` · ${provider.model_name}` : ''}
-                            {formData.base_url === provider.base_url ? ' · 当前使用中' : ''}
-                          </small>
-                        </div>
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          disabled={importCcMutation.isPending}
-                          onClick={() => handleImportCcProvider(provider)}
-                        >
-                          {importCcMutation.isPending && importCcMutation.variables === provider.id
-                            ? '导入中...'
-                            : '导入并启用'}
-                        </button>
-                      </article>
-                    ))}
-                    {!ccProviders.length ? (
-                      <div className="empty-inline">CC Switch 里没有带地址和密钥的可导入供应商。</div>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
 
               <div className="field-grid">
@@ -510,42 +466,38 @@ export default function Settings() {
                 </div>
               ) : null}
 
-              <div className="panel-header">
-                <div>
-                  <p className="eyebrow">生成默认值</p>
-                  <h2>运行时默认配置</h2>
+              <details className="advanced-config">
+                <summary>高级参数（温度 / Token 上限）</summary>
+                <div className="field-grid">
+                  <label className="field">
+                    <span>温度</span>
+                    <input
+                      className="settings-range"
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={formData.temperature}
+                      onChange={(event) => setEdits((prev) => ({ ...prev, temperature: parseFloat(event.target.value) }))}
+                    />
+                    <small className="inline-hint">当前值：{formData.temperature}</small>
+                  </label>
+
+                  <label className="field">
+                    <span>最大 Token</span>
+                    <input
+                      type="number"
+                      min="100"
+                      max="32000"
+                      value={formData.max_tokens}
+                      onChange={(event) => setEdits((prev) => ({
+                        ...prev,
+                        max_tokens: parseInt(event.target.value, 10) || DEFAULT_CONFIG.max_tokens,
+                      }))}
+                    />
+                  </label>
                 </div>
-              </div>
-
-              <div className="field-grid">
-                <label className="field">
-                  <span>温度</span>
-                  <input
-                    className="settings-range"
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={formData.temperature}
-                    onChange={(event) => setEdits((prev) => ({ ...prev, temperature: parseFloat(event.target.value) }))}
-                  />
-                  <small className="inline-hint">当前值：{formData.temperature}</small>
-                </label>
-
-                <label className="field">
-                  <span>最大 Token</span>
-                  <input
-                    type="number"
-                    min="100"
-                    max="32000"
-                    value={formData.max_tokens}
-                    onChange={(event) => setEdits((prev) => ({
-                      ...prev,
-                      max_tokens: parseInt(event.target.value, 10) || DEFAULT_CONFIG.max_tokens,
-                    }))}
-                  />
-                </label>
-              </div>
+              </details>
 
               {notice ? (
                 <div className={`panel-alert ${notice.ok ? '' : 'error'}`}>
@@ -582,6 +534,63 @@ export default function Settings() {
           </section>
 
           <aside className="detail-rail">
+            <section className="panel cc-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">快速接入</p>
+                  <h2>从 CC Switch 导入</h2>
+                  <p className="panel-subtext">
+                    {ccSwitch?.found
+                      ? `本机已发现 ${ccProviders.length} 个供应商。`
+                      : '未检测到 CC Switch（~/.cc-switch），请用左侧表单手动配置。'}
+                  </p>
+                </div>
+              </div>
+              {ccSwitch?.found ? (
+                <>
+                  <input
+                    type="search"
+                    className="cc-search"
+                    value={ccQuery}
+                    onChange={(event) => setCcQuery(event.target.value)}
+                    placeholder="搜索名称 / 地址 / 模型..."
+                  />
+                  <div className="cc-import-list">
+                    {filteredCcProviders.map((provider) => (
+                      <article
+                        key={provider.id}
+                        className={`cc-import-row ${formData.base_url === provider.base_url ? 'active' : ''}`}
+                      >
+                        <div className="cc-import-info">
+                          <strong>{provider.name}</strong>
+                          <code>{provider.base_url}</code>
+                          <small>
+                            {provider.app_type === 'claude' ? 'Claude 协议' : 'OpenAI 兼容'}
+                            {provider.model_name ? ` · ${provider.model_name}` : ''}
+                            {formData.base_url === provider.base_url ? ' · 当前使用中' : ''}
+                          </small>
+                        </div>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={importCcMutation.isPending}
+                          onClick={() => handleImportCcProvider(provider)}
+                        >
+                          {importCcMutation.isPending && importCcMutation.variables === provider.id
+                            ? '导入中...'
+                            : '导入'}
+                        </button>
+                      </article>
+                    ))}
+                    {!filteredCcProviders.length ? (
+                      <div className="empty-inline">没有匹配「{ccQuery}」的供应商。</div>
+                    ) : null}
+                  </div>
+                  <small className="inline-hint">导入会立即保存为活动配置；重启 AI-skill 后网关生效。</small>
+                </>
+              ) : null}
+            </section>
+
             <section className="panel">
               <div className="panel-header">
                 <div>
@@ -593,10 +602,8 @@ export default function Settings() {
                 </button>
               </div>
               <div className="stack-list">
-                <InfoRow label="网关" value={hermesMonitor?.gateway_url || '未配置'} />
                 <InfoRow label="状态" value={connected ? '已连接' : hermesMonitor?.error || '离线'} />
                 <InfoRow label="模型数" value={String(hermesMonitor?.models_count || 0)} />
-                <InfoRow label="API Key" value={hermesMonitor?.has_key ? '已配置' : '缺失'} />
                 <InfoRow label="上次检查" value={formatDate(hermesMonitor?.checked_at)} />
               </div>
               {hermesMonitor?.models?.length ? (
@@ -608,16 +615,13 @@ export default function Settings() {
               ) : null}
             </section>
 
-            <section className="panel">
-              <div className="panel-header">
+            <details className="panel skill-panel">
+              <summary className="panel-header">
                 <div>
                   <p className="eyebrow">技能</p>
-                  <h2>本地技能清单</h2>
+                  <h2>本地技能清单（{hermesSkills.length}）</h2>
                 </div>
-                <button type="button" className="secondary-button" onClick={() => refetchSkills()} disabled={isSkillsFetching}>
-                  {isSkillsFetching ? '刷新中...' : '刷新列表'}
-                </button>
-              </div>
+              </summary>
               <div className="skill-card-grid">
                 {hermesSkills.slice(0, 6).map((skill) => (
                   <article key={skill.path} className="skill-card">
@@ -631,35 +635,25 @@ export default function Settings() {
                 ))}
                 {!hermesSkills.length ? <div className="empty-inline">还没有发现本地技能。</div> : null}
               </div>
-            </section>
+            </details>
 
-            <section className="panel">
-              <div className="panel-header">
+            <details className="panel">
+              <summary className="panel-header">
                 <div>
                   <p className="eyebrow">运行说明</p>
                   <h2>这份配置会影响什么</h2>
                 </div>
-              </div>
+              </summary>
               <div className="stack-list">
                 <InfoRow label="通用内容" value="模型配置会影响兼容模式下的内容生成和相关导出。" />
                 <InfoRow label="智能体工作台" value="基于 Hermes 的智能体运行会优先使用 Hermes 网关，而不是这里的提供方表单。" />
                 <InfoRow label="本地技能" value="模板会引用从 hermes_skills/ 目录发现的技能路径。" />
               </div>
-            </section>
+            </details>
           </aside>
         </div>
       </main>
     </div>
-  )
-}
-
-function MetricCard({ label, value, helper }) {
-  return (
-    <article className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{helper}</small>
-    </article>
   )
 }
 

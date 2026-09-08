@@ -52,6 +52,107 @@
   overflow-wrap: anywhere;
 }
 
+.panel-subtext {
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--muted, #64748b);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advanced-config {
+  border: 1px solid var(--line, #e5eaf0);
+  border-radius: 8px;
+  background: var(--surface-soft, #f8fafc);
+}
+
+.advanced-config summary {
+  padding: 9px 12px;
+  cursor: pointer;
+  color: var(--text, #1f2937);
+  font-size: 13px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.advanced-config summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-config summary::before {
+  content: '▸ ';
+  color: var(--muted, #64748b);
+}
+
+.advanced-config[open] summary::before {
+  content: '▾ ';
+}
+
+.advanced-config .field-grid {
+  padding: 0 12px 12px;
+}
+
+details.panel > summary.panel-header {
+  cursor: pointer;
+  list-style: none;
+}
+
+details.panel > summary.panel-header::-webkit-details-marker {
+  display: none;
+}
+
+details.panel[open] > summary.panel-header {
+  border-bottom: 1px solid var(--line, #e5eaf0);
+  padding-bottom: 10px;
+}
+
+.cc-search {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong, #cbd5e1);
+  border-radius: 8px;
+  background: var(--surface, #ffffff);
+  font-size: 13px;
+}
+
+.cc-search:focus {
+  border-color: var(--primary, #1f6feb);
+  outline: none;
+}
+
+.detail-rail .stack-list {
+  gap: 0;
+}
+
+.detail-rail .info-row {
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+}
+
+.detail-rail .info-row span {
+  font-size: 11px;
+}
+
+.detail-rail .info-row p {
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-rail .panel-header {
+  margin-bottom: 2px;
+}
+
+.detail-rail .panel-header h2 {
+  font-size: 15px;
+}
+
 .remote-model-grid {
   display: flex;
   flex-wrap: wrap;
@@ -90,21 +191,6 @@
 .remote-model-chip:disabled {
   cursor: wait;
   opacity: 0.6;
-}
-
-.cc-import-panel {
-  display: grid;
-  gap: 10px;
-  margin: 6px 0 14px;
-  padding: 12px;
-  border: 1px solid var(--line-strong, #d9e1ea);
-  border-radius: 10px;
-  background: var(--surface-soft, #f8fafc);
-}
-
-.cc-import-head h3 {
-  margin: 0 0 2px;
-  font-size: 14px;
 }
 
 .cc-import-list {

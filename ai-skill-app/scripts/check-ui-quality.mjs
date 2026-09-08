@@ -14,6 +14,7 @@ const files = {
   artifactList: read('src/components/workbench/ArtifactList.jsx'),
   agentRuns: read('src/pages/AgentRuns.jsx'),
   settings: read('src/pages/Settings.jsx'),
+  settingsCss: read('src/pages/Settings.css'),
   workbenchHome: read('src/pages/WorkbenchHome.jsx'),
   workbenchSidebar: read('src/components/workbench/Sidebar.jsx'),
   indexCss: read('src/index.css'),
@@ -152,6 +153,23 @@ const checks = [
         '.artifact-raw',
       ].every((text) => files.indexCss.includes(text)),
     hint: 'Run detail artifacts should show file cards and collapsible raw data instead of defaulting to a JSON dump.',
+  },
+  {
+    name: 'Settings groups quick import into the rail with search',
+    ok: [
+      'cc-search',
+      '从 CC Switch 导入',
+      'advanced-config',
+      'panel-subtext',
+      'filteredCcProviders',
+    ].every((text) => files.settings.includes(text)) &&
+      [
+        '.cc-import-list',
+        '.cc-import-row',
+        'max-height',
+        'details.panel',
+      ].every((text) => files.settingsCss.includes(text)),
+    hint: 'Settings should keep the CC Switch import searchable and height-capped, with secondary panels collapsed.',
   },
   {
     name: 'Run history supports search and status filters',
