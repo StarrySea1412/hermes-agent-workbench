@@ -20,6 +20,14 @@ export function fetchAIModels(data) {
   return client.post('/ai-config/models', data)
 }
 
+export function listCcSwitchProviders() {
+  return client.get('/ai-config/cc-switch')
+}
+
+export function importCcSwitchProvider(providerId) {
+  return client.post('/ai-config/cc-switch/import', { provider_id: providerId })
+}
+
 export function getHermesStatus() {
   return client.get('/hermes/status')
 }

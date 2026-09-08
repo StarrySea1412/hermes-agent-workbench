@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.agents.skill_loader import get_skill_document, list_skills
+from apps.ai_config.cc_switch_service import get_cc_switch_provider, list_cc_switch_providers
 from apps.ai_config.models import AIConfig
 from apps.ai_config.serializers import (
     AIConfigCreateSerializer,
@@ -68,6 +69,47 @@ def ai_config_view(request):
     config.save()
     _sync_hermes_config(request.user)
     return Response(AIConfigSerializer(config).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def cc_switch_providers(request):
+    result = list_cc_switch_providers()
+    return Response(result)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cc_switch_import(request):
+    provider_id = str(request.data.get("provider_id") or "").strip()
+    if not provider_id:
+        return Response({"message": "缺少 provider_id。"}, status=status.HTTP_400_BAD_REQUEST)
+
+    provider = get_cc_switch_provider(provider_id)
+    if not provider:
+        return Response({"message": "未找到该 CC Switch 供应商，或缺少地址/密钥。"}, status=status.HTTP_404_NOT_FOUND)
+
+    config, _created = AIConfig.objects.update_or_create(
+        user=request.user,
+        defaults={
+            "provider": provider["provider"],
+            "api_key_encrypted": get_encryption().encrypt(provider["api_key"]),
+            "base_url": provider["base_url"],
+            "model_name": provider["model_name"],
+        },
+    )
+    _sync_hermes_config(request.user)
+    return Response({
+        "message": f"已导入并启用：{provider['name']}（重启 AI-skill 后网关使用新配置）",
+        "provider": {
+            "name": provider["name"],
+            "app_type": provider["app_type"],
+            "provider": provider["provider"],
+            "base_url": provider["base_url"],
+            "model_name": provider["model_name"],
+        },
+        "config": AIConfigSerializer(config).data,
+    })
 
 
 @api_view(["POST"])

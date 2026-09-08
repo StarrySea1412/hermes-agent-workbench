@@ -41,6 +41,30 @@ export function useFetchAIModels() {
   })
 }
 
+export function useCcSwitchProviders() {
+  return useQuery({
+    queryKey: ['ccSwitchProviders'],
+    queryFn: async () => {
+      try {
+        return await aiConfigApi.listCcSwitchProviders()
+      } catch (error) {
+        return { found: false, path: '', providers: [], error: error.message }
+      }
+    },
+    staleTime: 60000,
+  })
+}
+
+export function useImportCcSwitchProvider() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (providerId) => aiConfigApi.importCcSwitchProvider(providerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['aiConfig'] })
+    },
+  })
+}
+
 export function useHermesStatus() {
   return useQuery({
     queryKey: ['hermesStatus'],

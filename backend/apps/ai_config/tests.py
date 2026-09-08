@@ -1,3 +1,6 @@
+import json
+import shutil
+import tempfile
 from io import StringIO
 from unittest.mock import patch
 
@@ -258,3 +261,92 @@ class HermesConfigSyncLoopGuardTests(APITestCase):
             self.assertFalse(result['ok'])
             self.assertEqual(result['reason'], 'gateway_self_reference')
             self.assertFalse(config_path.exists())
+
+
+@override_settings(
+    LOCAL_SINGLE_USER_MODE=False,
+    JWT_SECRET_KEY='test-jwt-secret-key-with-32-bytes!!',
+)
+class CcSwitchImportTests(APITestCase):
+    def setUp(self):
+        import sqlite3
+
+        self.db_dir = tempfile.mkdtemp()
+        self.addCleanup(lambda: shutil.rmtree(self.db_dir, ignore_errors=True))
+
+        db_path = self.db_dir + '/cc-switch.db'
+        connection = sqlite3.connect(db_path)
+        connection.execute(
+            "CREATE TABLE providers (id TEXT PRIMARY KEY, app_type TEXT, name TEXT, "
+            "settings_config TEXT, is_current INTEGER DEFAULT 0, sort_index INTEGER DEFAULT 0)"
+        )
+        connection.execute(
+            "INSERT INTO providers VALUES ('cla-1', 'claude', '测试中转', ?, 1, 0)",
+            (json.dumps({'env': {
+                'ANTHROPIC_AUTH_TOKEN': 'sk-cc-claude-key',
+                'ANTHROPIC_BASE_URL': 'https://claude.relay.example/',
+                'ANTHROPIC_MODEL': 'grok-4.5[1M]',
+            }}),),
+        )
+        connection.execute(
+            "INSERT INTO providers VALUES ('cod-1', 'codex', '测试OpenAI', ?, 0, 1)",
+            (json.dumps({
+                'auth': {'OPENAI_API_KEY': 'sk-cc-openai-key'},
+                'config': 'model = "gpt-5.6-luna"\n[model_providers.custom]\nname = "custom"\nbase_url = "https://api.relay.example/v1"\n',
+            }),),
+        )
+        connection.execute(
+            "INSERT INTO providers VALUES ('bad-1', 'claude', '缺key', ?, 0, 2)",
+            (json.dumps({'env': {'ANTHROPIC_BASE_URL': 'https://broken.example/'}}),),
+        )
+        connection.commit()
+        connection.close()
+
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='cc-user', password='password123')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {create_access_token(self.user.id)}')
+
+    def test_list_providers_excludes_incomplete_and_hides_keys(self):
+        with patch('apps.ai_config.cc_switch_service.get_cc_switch_db_path',
+                   return_value=f'{self.db_dir}/cc-switch.db'):
+            response = self.client.get('/api/ai-config/cc-switch')
+
+        self.assertEqual(response.status_code, 200)
+        providers = response.json()['providers']
+        self.assertEqual([item['id'] for item in providers], ['cla-1', 'cod-1'])
+        claude = providers[0]
+        self.assertEqual(claude['base_url'], 'https://claude.relay.example')
+        self.assertEqual(claude['model_name'], 'grok-4.5')
+        self.assertNotIn('api_key', claude)
+
+    def test_import_creates_active_config_without_exposing_key_to_client(self):
+        with patch('apps.ai_config.cc_switch_service.get_cc_switch_db_path',
+                   return_value=f'{self.db_dir}/cc-switch.db'), \
+             patch('apps.ai_config.views._sync_hermes_config'):
+            response = self.client.post(
+                '/api/ai-config/cc-switch/import',
+                {'provider_id': 'cla-1'},
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn('已导入并启用', payload['message'])
+
+        config = AIConfig.objects.get(user=self.user)
+        self.assertEqual(config.provider, 'anthropic')
+        self.assertEqual(config.base_url, 'https://claude.relay.example')
+        self.assertEqual(config.model_name, 'grok-4.5')
+        self.assertEqual(get_encryption().decrypt(config.api_key_encrypted), 'sk-cc-claude-key')
+        self.assertNotIn('sk-cc-claude-key', json.dumps(response.json()))
+
+    def test_import_rejects_unknown_provider(self):
+        with patch('apps.ai_config.cc_switch_service.get_cc_switch_db_path',
+                   return_value=f'{self.db_dir}/cc-switch.db'):
+            response = self.client.post(
+                '/api/ai-config/cc-switch/import',
+                {'provider_id': 'missing'},
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, 404)

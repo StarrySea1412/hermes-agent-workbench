@@ -5,10 +5,12 @@ import Sidebar from '../components/workbench/Sidebar'
 import { useAuth } from '../hooks/useAuth'
 import {
   useAIConfig,
+  useCcSwitchProviders,
   useCreateAIConfig,
   useFetchAIModels,
   useHermesMonitor,
   useHermesSkills,
+  useImportCcSwitchProvider,
   useTestAIConfig,
   useUpdateAIConfig,
 } from '../hooks/useAIConfig'
@@ -156,6 +158,8 @@ export default function Settings() {
   const updateMutation = useUpdateAIConfig()
   const testMutation = useTestAIConfig()
   const fetchModelsMutation = useFetchAIModels()
+  const importCcMutation = useImportCcSwitchProvider()
+  const { data: ccSwitch } = useCcSwitchProviders()
   const [edits, setEdits] = useState({})
   const [remoteModels, setRemoteModels] = useState([])
   const [notice, setNotice] = useState(null)
@@ -323,6 +327,19 @@ export default function Settings() {
     }
   }
 
+  const ccProviders = ccSwitch?.providers || []
+  const handleImportCcProvider = async (provider) => {
+    setNotice({ ok: true, text: `正在导入「${provider.name}」...` })
+    try {
+      const result = await importCcMutation.mutateAsync(provider.id)
+      setEdits({})
+      setRemoteModels([])
+      setNotice({ ok: true, text: result?.message || `已导入并启用：${provider.name}` })
+    } catch (error) {
+      setNotice({ ok: false, text: error.message || '导入失败。' })
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="workbench-shell">
@@ -362,6 +379,52 @@ export default function Settings() {
                   <p className="eyebrow">模型端点</p>
                   <h2>提供方配置</h2>
                 </div>
+              </div>
+
+              <div className="cc-import-panel">
+                <div className="cc-import-head">
+                  <div>
+                    <h3>从 CC Switch 导入</h3>
+                    <small className="inline-hint">
+                      {ccSwitch?.found
+                        ? `已发现本机 CC Switch 中的 ${ccProviders.length} 个供应商，点击即可导入启用。`
+                        : '未检测到 CC Switch 配置（~/.cc-switch），可手动填写下方表单。'}
+                    </small>
+                  </div>
+                </div>
+                {ccSwitch?.found ? (
+                  <div className="cc-import-list">
+                    {ccProviders.map((provider) => (
+                      <article
+                        key={provider.id}
+                        className={`cc-import-row ${formData.base_url === provider.base_url ? 'active' : ''}`}
+                      >
+                        <div className="cc-import-info">
+                          <strong>{provider.name}</strong>
+                          <code>{provider.base_url}</code>
+                          <small>
+                            {provider.app_type === 'claude' ? 'Claude 协议' : 'OpenAI 兼容'}
+                            {provider.model_name ? ` · ${provider.model_name}` : ''}
+                            {formData.base_url === provider.base_url ? ' · 当前使用中' : ''}
+                          </small>
+                        </div>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={importCcMutation.isPending}
+                          onClick={() => handleImportCcProvider(provider)}
+                        >
+                          {importCcMutation.isPending && importCcMutation.variables === provider.id
+                            ? '导入中...'
+                            : '导入并启用'}
+                        </button>
+                      </article>
+                    ))}
+                    {!ccProviders.length ? (
+                      <div className="empty-inline">CC Switch 里没有带地址和密钥的可导入供应商。</div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               <div className="field-grid">

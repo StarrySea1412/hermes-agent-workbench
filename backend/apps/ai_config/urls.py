@@ -4,6 +4,8 @@ from apps.ai_config import monitor_views, views
 
 urlpatterns = [
     path('ai-config', views.ai_config_view),
+    path('ai-config/cc-switch', views.cc_switch_providers),
+    path('ai-config/cc-switch/import', views.cc_switch_import),
     path('ai-config/models', views.list_ai_models),
     path('ai-config/test', views.test_ai_config),
     path('hermes/status', views.hermes_status),
