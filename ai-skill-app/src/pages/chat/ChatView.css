@@ -18,11 +18,23 @@
 }
 
 .chat-app .chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   min-width: 0;
-  min-height: 86px;
-  padding: 14px 22px 12px;
+  min-height: 0;
+  padding: 10px 20px 8px;
   border-bottom: 1px solid #d9e1ea;
   background: #ffffff;
+}
+
+.chat-app .chat-title-block {
+  flex: 1 1 auto;
+}
+
+.chat-app .chat-header-actions {
+  flex: 0 0 auto;
 }
 
 .chat-app .chat-title-block,
@@ -35,7 +47,7 @@
   margin: 0;
   overflow: hidden;
   color: #111827;
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -43,10 +55,10 @@
 
 .chat-app .chat-subtitle {
   max-width: min(100%, 860px);
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   overflow: hidden;
   color: #64748b;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -58,7 +70,11 @@
 }
 
 .chat-app .chat-runtime-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   min-width: 0;
+  margin-top: 6px;
   overflow: hidden;
 }
 
@@ -114,9 +130,9 @@
 
 .chat-app .task-overview {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  padding: 14px 22px;
+  padding: 10px 20px;
   border-bottom: 1px solid #d9e1ea;
   background: #f8fafc;
 }
@@ -130,16 +146,16 @@
 }
 
 .chat-app .task-overview-head h2 {
-  margin: 2px 0 0;
+  margin: 0;
   color: #111827;
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1.3;
 }
 
 .chat-app .task-progress {
   display: grid;
-  grid-template-columns: repeat(4, 36px);
-  gap: 6px;
+  grid-template-columns: repeat(4, 22px);
+  gap: 5px;
   flex: 0 0 auto;
 }
 
@@ -159,56 +175,49 @@
 
 .chat-app .task-card-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   min-width: 0;
 }
 
 .chat-app .task-card {
-  display: grid;
-  align-content: start;
-  gap: 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
-  min-height: 112px;
-  padding: 11px 12px;
+  min-height: 0;
+  padding: 8px 12px;
   border: 1px solid #d9e1ea;
   border-radius: 8px;
   background: #ffffff;
 }
 
 .chat-app .task-card span {
+  flex: 0 0 auto;
   color: #64748b;
   font-size: 11px;
   font-weight: 800;
 }
 
 .chat-app .task-card strong {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: #111827;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .chat-app .task-card p {
-  display: -webkit-box;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: none;
 }
 
 .chat-app .task-card-action {
-  justify-self: start;
-  min-height: 28px;
-  margin-top: auto;
-  padding: 4px 9px;
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 3px 9px;
   border: 1px solid #c7d7ec;
   border-radius: 8px;
   color: #164e8f;
@@ -253,7 +262,7 @@
   min-height: 0;
   max-height: none;
   overflow: auto;
-  padding: 22px clamp(18px, 3.2vw, 46px);
+  padding: 14px clamp(14px, 2.6vw, 32px);
   background: #ffffff;
 }
 
@@ -1102,6 +1111,19 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .chat-app .task-card {
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .chat-app .task-card p {
+    -webkit-line-clamp: 1;
+  }
+
+  .chat-app .task-card-action {
+    display: none;
+  }
+
   .chat-app .chat-workspace {
     grid-template-columns: minmax(0, 1fr);
     height: auto;
@@ -1145,7 +1167,7 @@
   }
 
   .chat-app .task-card-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .chat-app .runtime-summary-grid {

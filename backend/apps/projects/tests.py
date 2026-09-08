@@ -88,6 +88,12 @@ class BrokenHermes:
         raise RuntimeError('gateway failed')
 
 
+class GatewayFailureReplyHermes:
+    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None):
+        del messages, tools, system_prompt, tool_choice, extra_headers
+        return DummyResponse(DummyMessage(content='API call failed after 3 retries: Connection error.'))
+
+
 class DummyCompatAgent:
     def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None):
         del messages, tools, system_prompt, tool_choice, extra_headers
@@ -165,6 +171,52 @@ class ConversationHermesStreamTests(APITestCase):
         assistant_message = self.conversation.messages.filter(role='assistant').latest('id')
         self.assertEqual(assistant_message.content, '这是兼容链路的回答。')
         self.assertEqual(assistant_message.metadata['gateway'], 'compat')
+
+    @patch('services.chat_service.AIService', return_value=DummyCompatAgent())
+    @patch('services.chat_service.ChatService._get_config', return_value=SimpleNamespace(provider='openai'))
+    @patch('services.chat_service.create_hermes_service', return_value=GatewayFailureReplyHermes())
+    def test_conversation_stream_recovers_when_gateway_returns_upstream_failure_text(self, _mock_hermes, _mock_config, _mock_ai_service):
+        response = self.client.post(
+            f'/api/conversations/{self.conversation.id}/stream/',
+            {'content': '再试一轮。'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = ''.join(
+            item.decode('utf-8') if isinstance(item, bytes) else str(item)
+            for item in response.streaming_content
+        )
+
+        self.assertIn('Hermes 网关当前不可用', payload)
+        self.assertIn('event: done', payload)
+
+        assistant_message = self.conversation.messages.filter(role='assistant').latest('id')
+        self.assertEqual(assistant_message.content, '这是兼容链路的回答。')
+        self.assertEqual(assistant_message.metadata['gateway'], 'compat')
+        self.assertNotIn('Connection error', assistant_message.content)
+
+    @patch('services.chat_service.create_hermes_service', return_value=GatewayFailureReplyHermes())
+    def test_conversation_stream_uses_local_fallback_when_gateway_reply_is_failure_text(self, _mock_hermes):
+        response = self.client.post(
+            f'/api/conversations/{self.conversation.id}/stream/',
+            {'content': '没有配置时的保底。'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = ''.join(
+            item.decode('utf-8') if isinstance(item, bytes) else str(item)
+            for item in response.streaming_content
+        )
+
+        self.assertIn('Hermes 网关当前不可用', payload)
+        self.assertIn('event: done', payload)
+
+        assistant_message = self.conversation.messages.filter(role='assistant').latest('id')
+        self.assertIn('Hermes 运行时这一轮暂时不可用', assistant_message.content)
+        self.assertEqual(assistant_message.metadata['gateway'], 'fallback')
+        self.assertNotIn('Connection error', assistant_message.content)
 
     @patch('apps.projects.views.ChatService.stream_turn', side_effect=RuntimeError('upstream exploded'))
     def test_conversation_stream_error_event_includes_diagnostic(self, _mock_stream_turn):

@@ -15,27 +15,19 @@ export default function InsightPanel({ project, runtime, compact = false }) {
         <div>
           <p className="eyebrow">运行设置</p>
           <h2>{modelName}</h2>
-          <p className="insight-subtitle">当前对话会按设置页中保存的模型配置执行。</p>
+          <p className="insight-subtitle">按设置页保存的模型配置执行。</p>
         </div>
         <span className="runtime-pill">{runtime?.gatewayLabel || 'Hermes'}</span>
       </div>
 
       <div className="studio-setting-list">
-        <SettingRow
-          label="模型"
-          value={modelName}
-          helper="决定本轮回答、工具规划和文件生成使用哪个上游模型。"
-        />
+        <SettingRow label="模型" value={modelName} />
         <SettingRow
           label="提供方"
           value={providerName}
-          helper={runtime?.baseUrl ? `请求地址：${runtime.baseUrl}` : '来自设置页的当前活动配置。'}
+          helper={runtime?.baseUrl ? `请求地址：${runtime.baseUrl}` : '来自设置页的活动配置。'}
         />
-        <SettingRow
-          label="生成参数"
-          value={`温度 ${temperature} / 上限 ${maxTokens}`}
-          helper="温度影响发散程度；Token 上限影响单次回答可输出的长度。"
-        />
+        <SettingRow label="生成参数" value={`温度 ${temperature} / 上限 ${maxTokens}`} />
       </div>
 
       <div className="insight-section">

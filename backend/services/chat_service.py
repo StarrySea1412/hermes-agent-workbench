@@ -47,6 +47,40 @@ MODE_TOOL_NAMES = {
 
 MAX_HERMES_TURNS = 6
 
+UPSTREAM_FAILURE_MARKERS = (
+    "api call failed",
+    "api_connection_error",
+    "apiconnectionerror",
+    "apitimeouterror",
+    "authenticationerror",
+    "ratelimiterror",
+    "permissiondeniederror",
+    "error code:",
+    "connection error",
+    "connection refused",
+    "connecterror",
+    "certificate verify failed",
+    "rate limit exceeded",
+    "insufficient_quota",
+    "quota exceeded",
+    "invalid api key",
+    "bad gateway",
+)
+
+
+class GatewayUpstreamFailure(RuntimeError):
+    """Hermes gateway returned an upstream failure message instead of a model answer."""
+
+
+def _gateway_reply_failure(reply):
+    content = (reply or "").strip()
+    lowered = content.lower()
+    if not content or len(content) > 400:
+        return None
+    if not any(marker in lowered for marker in UPSTREAM_FAILURE_MARKERS):
+        return None
+    return f"Hermes gateway returned an upstream failure instead of an answer: {content[:200]}"
+
 
 class ChatService:
     def __init__(self, user):
@@ -445,6 +479,10 @@ class ChatService:
             raise RuntimeError(f"Hermes exhausted {MAX_HERMES_TURNS} turns without a final answer.")
 
         reply = loop_result.reply or "Hermes completed this turn without displayable text."
+        if gateway_label == "hermes":
+            failure_message = _gateway_reply_failure(reply)
+            if failure_message:
+                raise GatewayUpstreamFailure(failure_message)
         if gateway_label == "hermes" and _looks_like_gateway_tool_block(reply):
             raise RuntimeError("Hermes gateway stopped on internal file-execution permissions.")
 

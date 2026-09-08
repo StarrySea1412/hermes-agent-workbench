@@ -529,14 +529,35 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    padding: 12px;
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
     overflow: visible;
+  }
+
+  .chat-app .new-chat-btn {
+    min-height: 34px;
+  }
+
+  .chat-app .sidebar-nav {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    gap: 4px;
+    justify-content: start;
+    overflow-x: auto;
+  }
+
+  .chat-app .sidebar-nav-link {
+    padding: 6px 11px;
+    font-size: 13px;
   }
 
   .chat-app .mobile-history-toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-height: 32px;
+    padding: 4px 11px;
   }
 
   .chat-app .conversation-list {
