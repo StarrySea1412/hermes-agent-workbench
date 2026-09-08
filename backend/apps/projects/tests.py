@@ -117,9 +117,10 @@ class ConversationHermesStreamTests(APITestCase):
             mode='chat',
         )
 
+    @patch('services.chat_service.ChatService._get_config', return_value=None)
     @patch('services.chat_service.registry.execute_tool', return_value={'ok': True, 'result': {'filename': 'notes.md', 'text': 'sample'}})
     @patch('services.chat_service.create_hermes_service', return_value=DummyHermes())
-    def test_conversation_stream_uses_hermes_runtime_and_emits_tool_events(self, hermes_factory, execute_tool):
+    def test_conversation_stream_uses_hermes_runtime_and_emits_tool_events(self, hermes_factory, execute_tool, _mock_config):
         response = self.client.post(
             f'/api/conversations/{self.conversation.id}/stream/',
             {'content': '帮我读取资料然后总结。'},
@@ -147,6 +148,7 @@ class ConversationHermesStreamTests(APITestCase):
         self.assertEqual(assistant_message.metadata['used_tools'], ['doc_parse'])
         self.assertEqual(len(assistant_message.metadata['tool_events']), 1)
 
+    @patch.dict('os.environ', {'CHAT_PREFER_GATEWAY': '1'})
     @patch('services.chat_service.AIService', return_value=DummyCompatAgent())
     @patch('services.chat_service.ChatService._get_config', return_value=SimpleNamespace(provider='openai'))
     @patch('services.chat_service.create_hermes_service', return_value=BrokenHermes())
@@ -172,6 +174,30 @@ class ConversationHermesStreamTests(APITestCase):
         self.assertEqual(assistant_message.content, '这是兼容链路的回答。')
         self.assertEqual(assistant_message.metadata['gateway'], 'compat')
 
+    @patch('services.chat_service.AIService', return_value=DummyCompatAgent())
+    @patch('services.chat_service.ChatService._get_config', return_value=SimpleNamespace(provider='openai'))
+    @patch('services.chat_service.create_hermes_service', return_value=BrokenHermes())
+    def test_conversation_stream_prefers_compatible_agent_when_configured(self, _mock_hermes, _mock_config, _mock_ai_service):
+        response = self.client.post(
+            f'/api/conversations/{self.conversation.id}/stream/',
+            {'content': '配置了账号模型时优先直连。'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = ''.join(
+            item.decode('utf-8') if isinstance(item, bytes) else str(item)
+            for item in response.streaming_content
+        )
+
+        self.assertIn('event: done', payload)
+        self.assertNotIn('Hermes 网关当前不可用', payload)
+
+        assistant_message = self.conversation.messages.filter(role='assistant').latest('id')
+        self.assertEqual(assistant_message.content, '这是兼容链路的回答。')
+        self.assertEqual(assistant_message.metadata['gateway'], 'compat')
+
+    @patch.dict('os.environ', {'CHAT_PREFER_GATEWAY': '1'})
     @patch('services.chat_service.AIService', return_value=DummyCompatAgent())
     @patch('services.chat_service.ChatService._get_config', return_value=SimpleNamespace(provider='openai'))
     @patch('services.chat_service.create_hermes_service', return_value=GatewayFailureReplyHermes())

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from apps.agents.models import AgentRun
 from apps.ai_config.models import AIConfig
@@ -186,9 +187,13 @@ class ChatService:
         except Exception:
             logger.exception("Failed to create AgentRun for conversation_id=%s", conversation.id)
 
+        compat = self._get_compat_agent()
+        prefer_compat = compat is not None and os.getenv("CHAT_PREFER_GATEWAY", "").lower() not in ("1", "true", "yes")
+        hermes = create_hermes_service(session_id=session_id)
+
         yield "status", {
             "stage": "session_ready",
-            "gateway": "hermes",
+            "gateway": "compat" if prefer_compat else "hermes",
             "session_id": session_id,
             "mode": conversation.mode,
             "file_count": len(files),
@@ -200,61 +205,36 @@ class ChatService:
             thoughts.append(thought)
             yield "thought", thought
 
-        hermes = create_hermes_service(session_id=session_id)
-        if hermes:
-            try:
-                yield from self._stream_agent_reply(
-                    hermes,
-                    conversation,
-                    list(base_history),
-                    files,
-                    session_id,
-                    tool_names,
-                    thoughts,
-                    tool_events,
-                    used_tools,
-                    gateway_label="hermes",
-                    agent_run=agent_run,
-                )
-                return
-            except Exception as exc:
-                logger.exception("Hermes chat turn failed: conversation_id=%s user_id=%s", conversation.id, self.user.id)
-                diagnostic = describe_ai_exception(exc)
-                yield "status", {
-                    "stage": "compat_resume",
-                    "gateway": "compat",
-                    "session_id": session_id,
-                    "message": f"Hermes 网关当前不可用，已切换到当前账号模型继续执行：{_format_runtime_error(exc)}",
-                    "diagnostic": diagnostic,
-                }
-
-        compat = self._get_compat_agent()
-        if compat:
-            try:
-                yield from self._stream_agent_reply(
-                    compat,
-                    conversation,
-                    list(base_history),
-                    files,
-                    session_id,
-                    tool_names,
-                    thoughts,
-                    tool_events,
-                    used_tools,
-                    gateway_label="compat",
-                    agent_run=agent_run,
-                )
-                return
-            except Exception as exc:
-                logger.exception("Compatible chat turn failed: conversation_id=%s user_id=%s", conversation.id, self.user.id)
-                diagnostic = describe_ai_exception(exc)
-                yield "status", {
-                    "stage": "fallback",
-                    "gateway": "fallback",
-                    "session_id": session_id,
-                    "message": f"当前账号模型也不可用，已回退到本地保底答复：{_format_runtime_error(exc)}",
-                    "diagnostic": diagnostic,
-                }
+        if prefer_compat:
+            finished = yield from self._try_compat_then_hermes(
+                compat,
+                hermes,
+                conversation,
+                base_history,
+                files,
+                session_id,
+                tool_names,
+                thoughts,
+                tool_events,
+                used_tools,
+                agent_run,
+            )
+        else:
+            finished = yield from self._try_hermes_then_compat(
+                hermes,
+                compat,
+                conversation,
+                base_history,
+                files,
+                session_id,
+                tool_names,
+                thoughts,
+                tool_events,
+                used_tools,
+                agent_run,
+            )
+        if finished:
+            return
 
         if agent_run is not None:
             try:
@@ -284,6 +264,103 @@ class ChatService:
         for chunk in chunk_text(reply):
             yield "delta", {"content": chunk}
         yield "done", {"reply": reply, "metadata": metadata}
+
+    def _try_compat_then_hermes(
+        self,
+        compat,
+        hermes,
+        conversation,
+        base_history,
+        files,
+        session_id,
+        tool_names,
+        thoughts,
+        tool_events,
+        used_tools,
+        agent_run,
+    ):
+        """有账号模型配置时优先直连中转站：思考链可直读，网关作为后备。"""
+        if compat:
+            try:
+                yield from self._stream_agent_reply(
+                    compat, conversation, list(base_history), files, session_id, tool_names,
+                    thoughts, tool_events, used_tools, gateway_label="compat", agent_run=agent_run,
+                )
+                return True
+            except Exception as exc:
+                logger.exception("Compatible chat turn failed: conversation_id=%s user_id=%s", conversation.id, self.user.id)
+                yield "status", {
+                    "stage": "gateway_resume",
+                    "gateway": "hermes",
+                    "session_id": session_id,
+                    "message": f"当前账号模型不可用，已切换 Hermes 网关继续执行：{_format_runtime_error(exc)}",
+                    "diagnostic": describe_ai_exception(exc),
+                }
+        if hermes:
+            try:
+                yield from self._stream_agent_reply(
+                    hermes, conversation, list(base_history), files, session_id, tool_names,
+                    thoughts, tool_events, used_tools, gateway_label="hermes", agent_run=agent_run,
+                )
+                return True
+            except Exception as exc:
+                logger.exception("Hermes chat turn failed: conversation_id=%s user_id=%s", conversation.id, self.user.id)
+                yield "status", {
+                    "stage": "fallback",
+                    "gateway": "fallback",
+                    "session_id": session_id,
+                    "message": f"Hermes 网关也不可用，已回退到本地保底答复：{_format_runtime_error(exc)}",
+                    "diagnostic": describe_ai_exception(exc),
+                }
+        return False
+
+    def _try_hermes_then_compat(
+        self,
+        hermes,
+        compat,
+        conversation,
+        base_history,
+        files,
+        session_id,
+        tool_names,
+        thoughts,
+        tool_events,
+        used_tools,
+        agent_run,
+    ):
+        """旧行为：网关优先（CHAT_PREFER_GATEWAY=1 时启用）。"""
+        if hermes:
+            try:
+                yield from self._stream_agent_reply(
+                    hermes, conversation, list(base_history), files, session_id, tool_names,
+                    thoughts, tool_events, used_tools, gateway_label="hermes", agent_run=agent_run,
+                )
+                return True
+            except Exception as exc:
+                logger.exception("Hermes chat turn failed: conversation_id=%s user_id=%s", conversation.id, self.user.id)
+                yield "status", {
+                    "stage": "compat_resume",
+                    "gateway": "compat",
+                    "session_id": session_id,
+                    "message": f"Hermes 网关当前不可用，已切换到当前账号模型继续执行：{_format_runtime_error(exc)}",
+                    "diagnostic": describe_ai_exception(exc),
+                }
+        if compat:
+            try:
+                yield from self._stream_agent_reply(
+                    compat, conversation, list(base_history), files, session_id, tool_names,
+                    thoughts, tool_events, used_tools, gateway_label="compat", agent_run=agent_run,
+                )
+                return True
+            except Exception as exc:
+                logger.exception("Compatible chat turn failed: conversation_id=%s user_id=%s", conversation.id, self.user.id)
+                yield "status", {
+                    "stage": "fallback",
+                    "gateway": "fallback",
+                    "session_id": session_id,
+                    "message": f"当前账号模型也不可用，已回退到本地保底答复：{_format_runtime_error(exc)}",
+                    "diagnostic": describe_ai_exception(exc),
+                }
 
     def save_user_message(self, conversation, content, attachment_ids=None):
         metadata = {"attachments": attachment_ids or []}

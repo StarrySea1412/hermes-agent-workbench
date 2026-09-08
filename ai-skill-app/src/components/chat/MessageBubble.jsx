@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { resolveFileUrl } from '../../api/files'
 
 export default function MessageBubble({ message, pending }) {
@@ -10,6 +11,16 @@ export default function MessageBubble({ message, pending }) {
   const statusMessage = message.metadata?.status_message || ''
   const gatewayLabel = formatGateway(gateway)
   const artifactLinks = collectArtifactLinks(toolEvents)
+  const thinkingSeconds = message.metadata?.thinking_seconds
+  const thinkBodyRef = useRef(null)
+  const thinkingActive = pending && !answer
+  const thoughtCount = thoughts.length + (inlineThink ? 1 : 0)
+
+  useEffect(() => {
+    if (pending && thinkBodyRef.current) {
+      thinkBodyRef.current.scrollTop = thinkBodyRef.current.scrollHeight
+    }
+  }, [thoughts.length, pending])
 
   return (
     <article className={`message-row ${isUser ? 'user' : 'assistant'}`}>
@@ -17,13 +28,22 @@ export default function MessageBubble({ message, pending }) {
       <div className="message-bubble">
         <div className="message-role">{isUser ? '你' : 'Hermes'}</div>
 
-        {!isUser && thoughts.length || inlineThink ? (
-          <details className="thought-panel" open={pending || undefined}>
-            <summary>
-              <span>思考过程</span>
-              <small>{pending ? '思考中...' : `${thoughts.length + (inlineThink ? 1 : 0)} 条`}</small>
-            </summary>
-            <div className="thought-list">
+        {!isUser && thoughtCount || thinkingActive ? (
+          <section className={`thought-panel ${thinkingActive ? 'thinking' : ''}`} aria-live="polite">
+            <button
+              type="button"
+              className="thought-head"
+              onClick={(event) => {
+                const body = event.currentTarget.nextElementSibling
+                if (body) body.classList.toggle('collapsed')
+              }}
+            >
+              <span className={`thought-label ${thinkingActive ? 'shimmer' : ''}`}>
+                {thinkingActive ? '思考中' : `已思考 ${typeof thinkingSeconds === 'number' ? `${thinkingSeconds} 秒` : '完成'}`}
+              </span>
+              <small>{thinkingActive ? '正在流式输出...' : `${thoughtCount} 条`}</small>
+            </button>
+            <div className="thought-body" ref={thinkBodyRef}>
               {inlineThink ? (
                 <article className="thought-item model">
                   <strong>模型思考</strong>
@@ -36,8 +56,11 @@ export default function MessageBubble({ message, pending }) {
                   {thought.content ? <p>{thought.content}</p> : null}
                 </article>
               ))}
+              {thinkingActive && !thoughts.length && !inlineThink ? (
+                <div className="thought-waiting"><span /><span /><span /></div>
+              ) : null}
             </div>
-          </details>
+          </section>
         ) : null}
 
         {!isUser && (sessionId || gateway || statusMessage) ? (

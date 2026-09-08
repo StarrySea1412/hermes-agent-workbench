@@ -246,37 +246,109 @@
   overflow: hidden;
 }
 
-.chat-app .thought-panel summary {
+.chat-app .thought-panel.thinking {
+  border-color: #c7b8f5;
+  box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.12);
+}
+
+.chat-app .thought-head {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding: 7px 10px;
+  border: 0;
+  background: transparent;
   cursor: pointer;
+  text-align: left;
+}
+
+.chat-app .thought-label {
   color: #475569;
   font-size: 12px;
   font-weight: 800;
-  list-style: none;
 }
 
-.chat-app .thought-panel summary::-webkit-details-marker {
+.chat-app .thought-head small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.chat-app .thought-body {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  padding: 4px 10px 10px;
+  border-top: 1px solid #e2e8f0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  animation: thought-reveal 0.28s ease;
+}
+
+.chat-app .thought-body.collapsed {
   display: none;
 }
 
-.chat-app .thought-panel summary::before {
-  content: '▸';
-  font-size: 11px;
-  transition: transform 0.15s ease;
+@keyframes thought-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-.chat-app .thought-panel[open] summary::before {
-  transform: rotate(90deg);
+.chat-app .thought-label.shimmer {
+  background: linear-gradient(90deg, #7e22ce 25%, #d8b4fe 50%, #7e22ce 75%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thought-shimmer 1.6s linear infinite;
 }
 
-.chat-app .thought-list {
-  display: grid;
-  gap: 8px;
-  padding: 4px 10px 10px;
-  border-top: 1px solid #e2e8f0;
+@keyframes thought-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.chat-app .thought-waiting {
+  display: inline-flex;
+  gap: 5px;
+  padding: 6px 2px;
+}
+
+.chat-app .thought-waiting span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #c084fc;
+  animation: thought-bounce 1.2s ease-in-out infinite;
+}
+
+.chat-app .thought-waiting span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.chat-app .thought-waiting span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thought-bounce {
+  0%, 60%, 100% {
+    transform: none;
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
 .chat-app .thought-item {
