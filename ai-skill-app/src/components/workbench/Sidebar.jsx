@@ -38,18 +38,21 @@ export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false
         <NavLink to="/settings" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           设置
         </NavLink>
-        <NavLink to="/agent" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          总览
-        </NavLink>
-        <NavLink to="/templates" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          模板
-        </NavLink>
-        <NavLink to="/tools" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          工具
-        </NavLink>
-        <NavLink to="/memories" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          记忆
-        </NavLink>
+        <details className="sidebar-more">
+          <summary>更多功能</summary>
+          <NavLink to="/agent" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            总览
+          </NavLink>
+          <NavLink to="/templates" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            模板
+          </NavLink>
+          <NavLink to="/tools" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            工具
+          </NavLink>
+          <NavLink to="/memories" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            记忆
+          </NavLink>
+        </details>
       </nav>
 
       <section className="sidebar-panel">
@@ -64,7 +67,7 @@ export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false
         </small>
       </section>
 
-      <section className="sidebar-panel">
+      <section className="sidebar-panel sidebar-runs">
         <div className="sidebar-panel-header">
           <span>最近运行</span>
           <small>{runs.length}</small>

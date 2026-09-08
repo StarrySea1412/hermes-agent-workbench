@@ -137,6 +137,24 @@ const checks = [
     hint: 'Mobile workbench pages should show a compact top navigation instead of a full desktop sidebar before content.',
   },
   {
+    name: 'Workbench sidebar stays within one viewport height',
+    ok: [
+      'sidebar-more',
+      '.workbench-sidebar .sidebar-runs .sidebar-run-list',
+      'height: 100vh',
+      'overflow: auto',
+      'flex: 1 1 auto',
+    ].every((text) => files.workbenchSidebar.includes('更多功能')) &&
+      [
+        'sidebar-more',
+        '.workbench-sidebar .sidebar-runs .sidebar-run-list',
+        'height: 100vh',
+        'overflow: auto',
+        'flex: 1 1 auto',
+      ].every((text) => files.indexCss.includes(text)),
+    hint: 'Desktop sidebar must pin to viewport height: primary nav visible, extras folded, run list scrolling internally, account pinned.',
+  },
+  {
     name: 'Run detail artifacts render as delivery cards',
     ok: [
       'artifact-file-card',
