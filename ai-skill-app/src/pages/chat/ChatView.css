@@ -901,6 +901,19 @@
   border-top: 1px solid #c7d7ec;
   color: #164e8f;
   background: #edf5ff;
+}
+
+.chat-app .chat-notice.switch {
+  border-top-color: #f2dcb1;
+  color: #92600a;
+  background: #fdf6e8;
+}
+
+.chat-app .chat-notice.switch .chat-diagnostic-list dt {
+  color: #b7821f;
+}
+
+.chat-app .chat-notice-main strong {
   font-size: 13px;
   line-height: 1.5;
 }

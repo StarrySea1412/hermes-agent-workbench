@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import httpx
 from openai import OpenAI
 
 from django.conf import settings
@@ -204,6 +205,8 @@ class AIService:
             "max_tokens": self.max_tokens if max_tokens is None else max_tokens,
             "stream": True,
             "stream_options": {"include_usage": False},
+            # 思考型模型在分片之间可能停顿很久，流式读超时单独放宽
+            "timeout": httpx.Timeout(settings.AI_DEFAULT_TIMEOUT, read=settings.AI_STREAM_TIMEOUT),
         }
         if extra_headers:
             kwargs["extra_headers"] = extra_headers

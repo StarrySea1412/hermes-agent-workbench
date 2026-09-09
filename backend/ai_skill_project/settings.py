@@ -222,6 +222,8 @@ if not DEBUG and JWT_SECRET_KEY == 'dev-secret-key-please-change-in-production':
 AI_CONFIG_ENCRYPTION_KEY = os.environ.get('AI_CONFIG_ENCRYPTION_KEY', 'change-this-to-a-fernet-key-in-production')
 
 AI_DEFAULT_TIMEOUT = int(os.environ.get('AI_DEFAULT_TIMEOUT', '60'))
+# 流式请求的读超时：思考型模型在中转站后面可能长时间不吐下一个分片
+AI_STREAM_TIMEOUT = int(os.environ.get('AI_STREAM_TIMEOUT', '240'))
 AI_MAX_RETRIES = int(os.environ.get('AI_MAX_RETRIES', '3'))
 AI_DEFAULT_PROVIDER = os.environ.get('AI_DEFAULT_PROVIDER', 'openai')
 AI_DEFAULT_BASE_URL = os.environ.get('AI_DEFAULT_BASE_URL', '')

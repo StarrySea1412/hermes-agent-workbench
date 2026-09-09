@@ -528,7 +528,7 @@ function TaskOverview({ workspace, runtime, onOpenProjects, onOpenSettings, onOp
 function ChatNotice({ notice, copyState, onCopy }) {
   const normalized = normalizeNotice(notice)
   return (
-    <div className={`chat-notice ${normalized.ok === false ? 'error' : ''}`}>
+    <div className={`chat-notice ${normalized.ok === false ? 'error' : ''} ${normalized.level === 'switch' ? 'switch' : ''}`}>
       <div className="chat-notice-main">
         <strong>{normalized.text}</strong>
         {normalized.diagnosticText ? (
@@ -559,8 +559,10 @@ function buildRuntimeNotice(status = {}) {
   }
   const diagnostic = status.diagnostic
   const text = status.message || diagnostic.message || '运行链路发生切换。'
+  // 链路切换是运行时降级，不是致命错误：中性提示样式，不渲染成红色错误横幅
   return {
-    ok: false,
+    ok: true,
+    level: 'switch',
     text,
     diagnostic,
     details: buildDiagnosticDetails({
