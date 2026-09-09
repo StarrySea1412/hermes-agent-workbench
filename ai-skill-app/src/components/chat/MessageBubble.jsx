@@ -165,6 +165,20 @@ function renderMarkdownLite(content) {
   const lines = String(content || '').split('\n')
   const blocks = []
   let index = 0
+  // 空行打断的列表要合并回同一个列表（助手常在编号项之间留空行）
+  let pendingList = null
+
+  const flushList = () => {
+    if (!pendingList) return
+    const { ordered, items, start, key } = pendingList
+    const Tag = ordered ? 'ol' : 'ul'
+    blocks.push(
+      <Tag key={key} className="markdown-list" start={ordered ? start : undefined}>
+        {items.map((item, itemIndex) => <li key={itemIndex}>{renderInlineText(item)}</li>)}
+      </Tag>
+    )
+    pendingList = null
+  }
 
   while (index < lines.length) {
     const rawLine = lines[index]
@@ -176,6 +190,7 @@ function renderMarkdownLite(content) {
     }
 
     if (line.trim().startsWith('```')) {
+      flushList()
       const language = line.trim().slice(3).trim()
       const codeLines = []
       index += 1
@@ -194,6 +209,7 @@ function renderMarkdownLite(content) {
     }
 
     if (isTableStart(lines, index)) {
+      flushList()
       const tableLines = []
       while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
         tableLines.push(lines[index])
@@ -204,49 +220,47 @@ function renderMarkdownLite(content) {
     }
 
     if (line.startsWith('### ')) {
+      flushList()
       blocks.push(<h4 key={`h4-${index}`}>{renderInlineText(line.slice(4))}</h4>)
       index += 1
       continue
     }
     if (line.startsWith('## ')) {
+      flushList()
       blocks.push(<h3 key={`h3-${index}`}>{renderInlineText(line.slice(3))}</h3>)
       index += 1
       continue
     }
     if (line.startsWith('# ')) {
+      flushList()
       blocks.push(<h2 key={`h2-${index}`}>{renderInlineText(line.slice(2))}</h2>)
       index += 1
       continue
     }
 
-    if (/^\s*[-*]\s+/.test(line)) {
-      const items = []
-      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
-        items.push(lines[index].replace(/^\s*[-*]\s+/, ''))
-        index += 1
+    const bulletMatch = /^\s*[-*]\s+/.test(line)
+    const numberMatch = /^\s*(\d+)[.)]\s+/.exec(line)
+    if (bulletMatch || numberMatch) {
+      const ordered = Boolean(numberMatch)
+      const item = ordered
+        ? line.replace(/^\s*\d+[.)]\s+/, '')
+        : line.replace(/^\s*[-*]\s+/, '')
+      if (pendingList && pendingList.ordered === ordered) {
+        pendingList.items.push(item)
+      } else {
+        flushList()
+        pendingList = {
+          ordered,
+          items: [item],
+          start: ordered ? Number(numberMatch[1]) : undefined,
+          key: `${ordered ? 'ol' : 'ul'}-${index}`,
+        }
       }
-      blocks.push(
-        <ul key={`ul-${index}`} className="markdown-list">
-          {items.map((item, itemIndex) => <li key={itemIndex}>{renderInlineText(item)}</li>)}
-        </ul>
-      )
+      index += 1
       continue
     }
 
-    if (/^\s*\d+[.)]\s+/.test(line)) {
-      const items = []
-      while (index < lines.length && /^\s*\d+[.)]\s+/.test(lines[index])) {
-        items.push(lines[index].replace(/^\s*\d+[.)]\s+/, ''))
-        index += 1
-      }
-      blocks.push(
-        <ol key={`ol-${index}`} className="markdown-list">
-          {items.map((item, itemIndex) => <li key={itemIndex}>{renderInlineText(item)}</li>)}
-        </ol>
-      )
-      continue
-    }
-
+    flushList()
     const paragraph = [line]
     index += 1
     while (
@@ -264,6 +278,7 @@ function renderMarkdownLite(content) {
     blocks.push(<p key={`p-${index}`}>{renderInlineText(paragraph.join(' '))}</p>)
   }
 
+  flushList()
   return blocks
 }
 
