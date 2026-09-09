@@ -74,7 +74,7 @@ class DummyHermes:
     def __init__(self):
         self.calls = 0
 
-    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None):
+    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None, max_tokens=None):
         del messages, tools, system_prompt, tool_choice, extra_headers
         self.calls += 1
         if self.calls == 1:
@@ -83,19 +83,19 @@ class DummyHermes:
 
 
 class BrokenHermes:
-    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None):
+    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None, max_tokens=None):
         del messages, tools, system_prompt, tool_choice, extra_headers
         raise RuntimeError('gateway failed')
 
 
 class GatewayFailureReplyHermes:
-    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None):
+    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None, max_tokens=None):
         del messages, tools, system_prompt, tool_choice, extra_headers
         return DummyResponse(DummyMessage(content='API call failed after 3 retries: Connection error.'))
 
 
 class DummyCompatAgent:
-    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None):
+    def chat_with_tools(self, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None, max_tokens=None):
         del messages, tools, system_prompt, tool_choice, extra_headers
         return DummyResponse(DummyMessage(content='这是兼容链路的回答。'))
 
