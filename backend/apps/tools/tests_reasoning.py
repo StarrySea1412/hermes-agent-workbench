@@ -102,3 +102,58 @@ class ToolLoopReasoningTests(SimpleTestCase):
         result, events = self._run(SimpleNamespace(content="普通回答。"))
         self.assertEqual(result.reply, "普通回答。")
         self.assertFalse(any(item.get("source") == "model" for kind, payload in events if kind == "thought" for item in [payload]))
+
+
+class ToolLoopThinkingBudgetTests(SimpleTestCase):
+    """回归：推理型模型把输出预算耗尽在思考链上时（只有思考、没有正文），应放大 max_tokens 重试而不是返回空回复。"""
+
+    def _run_stream_agent(self, turns):
+        """turns: 每轮 (reasoning, answer) 的列表，第 N 次调用返回第 N 项。"""
+        calls = []
+
+        def stream(*args, **kwargs):
+            calls.append(kwargs.get("max_tokens"))
+            reasoning, answer = turns[min(len(calls) - 1, len(turns) - 1)]
+            if reasoning:
+                yield ("reasoning", reasoning)
+            if answer:
+                yield ("answer", answer)
+            yield ("final", SimpleNamespace(content=answer, tool_calls=None))
+
+        return SimpleNamespace(stream_chat_with_tools=stream), calls
+
+    def _run(self, turns):
+        agent, calls = self._run_stream_agent(turns)
+        events = []
+        result = run_tool_loop(
+            agent=agent,
+            history=[{"role": "user", "content": "hi"}],
+            tool_names=[],
+            build_system_prompt=lambda native, text: "",
+            tool_context={},
+            max_turns=4,
+            on_event=lambda kind, payload: events.append((kind, payload)),
+        )
+        return result, calls, events
+
+    def test_thought_only_turn_retries_with_larger_budget(self):
+        result, calls, events = self._run([("只想答案，没写完就断了。", ""), ("", "最终答案。")])
+
+        self.assertEqual(result.reply, "最终答案。")
+        self.assertEqual(calls[0], None)  # 第一轮用 agent 默认预算
+        self.assertEqual(calls[1], 8192)  # 重试放大到 8192
+        statuses = [payload for kind, payload in events if kind == "status"]
+        self.assertTrue(any("输出预算" in item.get("message", "") for item in statuses))
+
+    def test_retry_twice_then_answer(self):
+        result, calls, _ = self._run([("思考A", ""), ("思考B", ""), ("", "答案")])
+
+        self.assertEqual(result.reply, "答案")
+        self.assertEqual(calls, [None, 8192, 16384])
+
+    def test_budget_ladder_gives_up_after_two_retries(self):
+        result, calls, _ = self._run([("思考", "")])
+
+        self.assertEqual(result.reply, "")
+        self.assertEqual(calls, [None, 8192, 16384])
+        self.assertFalse(result.exhausted)

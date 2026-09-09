@@ -591,7 +591,12 @@ class ChatService:
         if loop_result.exhausted:
             raise RuntimeError(f"Hermes exhausted {MAX_HERMES_TURNS} turns without a final answer.")
 
-        reply = loop_result.reply or "Hermes completed this turn without displayable text."
+        # 空回复：模型只有思考没有正文。带诊断提示而不是无声吞掉，方便用户重试或调整模型。
+        reply = loop_result.reply
+        if not reply:
+            raise RuntimeError(
+                "模型这轮只输出了思考内容，没有生成正文。请重新发送，或在设置页换一个模型 / 调大输出上限。"
+            )
         if gateway_label == "hermes":
             failure_message = _gateway_reply_failure(reply)
             if failure_message:

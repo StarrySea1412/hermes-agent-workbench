@@ -43,18 +43,21 @@ def summarize_tool_result(result):
     return json.dumps(payload, ensure_ascii=False)[:180] if payload is not None else "工具执行完成。"
 
 
-def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, emit, turn_number):
+def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, emit, turn_number, max_tokens=None):
     """消费中转站流式响应：思考链与正文逐字 emit，返回 (reasoning, answer, message)。"""
     reasoning_parts = []
     answer_parts = []
     message = None
-    for kind, payload in agent.stream_chat_with_tools(
-        history,
-        tools=tools,
-        system_prompt=system_prompt,
-        tool_choice="auto",
-        extra_headers=extra_headers,
-    ):
+    call_kwargs = {
+        "history": history,
+        "tools": tools,
+        "system_prompt": system_prompt,
+        "tool_choice": "auto",
+        "extra_headers": extra_headers,
+    }
+    if max_tokens is not None:
+        call_kwargs["max_tokens"] = max_tokens
+    for kind, payload in agent.stream_chat_with_tools(**call_kwargs):
         if kind == "reasoning":
             reasoning_parts.append(payload)
             emit("thought_delta", {"text": payload, "turn": turn_number})
@@ -89,6 +92,9 @@ def run_tool_loop(
     tools_prompt_text = schemas.prompt_tools_section(allowed)
     history = list(history)
     result = ToolLoopResult(history=history)
+    # 推理型模型可能把输出预算全部花在思考链上（正文为空），
+    # 此时空回答不直接落兜底文案，而是放大 max_tokens 重试，最多 2 档（8192 → 16384）。
+    budget_step = 0
 
     def emit(event_type: str, payload: Dict[str, Any]):
         if on_event:
@@ -102,6 +108,7 @@ def run_tool_loop(
         result.turns = turn_index + 1
         system_prompt = build_system_prompt(tools_prompt_native, tools_prompt_text)
         use_stream = hasattr(agent, "stream_chat_with_tools")
+        retry_budget = (8192, 16384)[budget_step - 1] if budget_step else None
 
         try:
             if use_stream:
@@ -113,6 +120,7 @@ def run_tool_loop(
                     extra_headers,
                     emit,
                     turn_index + 1,
+                    max_tokens=retry_budget,
                 )
             else:
                 response = agent.chat_with_tools(
@@ -121,6 +129,7 @@ def run_tool_loop(
                     system_prompt=system_prompt,
                     tool_choice="auto",
                     extra_headers=extra_headers,
+                    max_tokens=retry_budget,
                 )
                 message = response.choices[0].message
                 reasoning_text, answer_text = "", ""
@@ -166,7 +175,16 @@ def run_tool_loop(
             emit("thought", thought)
 
         if not tool_calls:
-            result.reply = cleaned_text or ""
+            cleaned = cleaned_text or ""
+            if not cleaned and reasoning and budget_step < 2:
+                # 只有思考没有正文：模型把输出预算耗尽在推理上，放大预算重试
+                budget_step += 1
+                emit("status", {
+                    "stage": "thinking_budget",
+                    "message": "模型思考占用了全部输出预算，正在加大输出上限重试。",
+                })
+                continue
+            result.reply = cleaned
             if result.reply:
                 history.append({"role": "assistant", "content": result.reply})
             return result

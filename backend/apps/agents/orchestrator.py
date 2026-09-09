@@ -408,7 +408,7 @@ def run_agent_loop(run: AgentRun, hermes: HermesService, *, max_steps=None, verb
             )
             return
 
-        final_answer = loop_result.reply or "The agent completed the run without a textual answer."
+        final_answer = loop_result.reply or "智能体这轮没有生成文字回答，可能只输出了思考内容。请重试或在设置页调整模型。"
         yield _emit_step(
             run,
             order=step_order,
