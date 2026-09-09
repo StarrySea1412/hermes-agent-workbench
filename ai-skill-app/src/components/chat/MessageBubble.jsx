@@ -41,19 +41,16 @@ export default function MessageBubble({ message, pending }) {
               <span className={`thought-label ${thinkingActive ? 'shimmer' : ''}`}>
                 {thinkingActive ? '思考中' : `已思考 ${typeof thinkingSeconds === 'number' ? `${thinkingSeconds} 秒` : '完成'}`}
               </span>
-              <small>{thinkingActive ? '正在流式输出...' : `${thoughtCount} 条`}</small>
+              <small>{thinkingActive ? '流式输出中' : `${thoughtCount} 条`}</small>
             </button>
             <div className="thought-body" ref={thinkBodyRef}>
-              {inlineThink ? (
-                <article className="thought-item model">
-                  <strong>模型思考</strong>
-                  <p>{inlineThink}</p>
-                </article>
-              ) : null}
               {thoughts.map((thought, index) => (
                 <article key={`${thought.title || 'step'}-${index}`} className={`thought-item ${thought.source === 'model' ? 'model' : ''}`}>
                   <strong>{thought.source === 'model' ? '模型思考' : (thought.title || `第 ${index + 1} 步`)}</strong>
-                  {thought.content ? <p>{thought.content}</p> : null}
+                  <p>
+                    {thought.content}
+                    {pending && index === thoughts.length - 1 && thought.source === 'model' ? <span className="type-caret" /> : null}
+                  </p>
                 </article>
               ))}
               {thinkingActive && !thoughts.length && !inlineThink ? (
@@ -126,6 +123,8 @@ export default function MessageBubble({ message, pending }) {
           {answer
             ? renderMarkdownLite(answer)
             : <span className="typing-dot">{pending ? '正在生成...' : '没有收到可显示的回复，请重试或检查模型连接。'}</span>}
+          {pending && answer ? <span className="type-caret" /> : null}
+          {!pending && answer ? null : null}
           {pending ? <span className="cursor-pulse" /> : null}
         </div>
       </div>

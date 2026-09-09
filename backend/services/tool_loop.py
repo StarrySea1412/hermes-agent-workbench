@@ -43,6 +43,29 @@ def summarize_tool_result(result):
     return json.dumps(payload, ensure_ascii=False)[:180] if payload is not None else "工具执行完成。"
 
 
+def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, emit, turn_number):
+    """消费中转站流式响应：思考链与正文逐字 emit，返回 (reasoning, answer, message)。"""
+    reasoning_parts = []
+    answer_parts = []
+    message = None
+    for kind, payload in agent.stream_chat_with_tools(
+        history,
+        tools=tools,
+        system_prompt=system_prompt,
+        tool_choice="auto",
+        extra_headers=extra_headers,
+    ):
+        if kind == "reasoning":
+            reasoning_parts.append(payload)
+            emit("thought_delta", {"text": payload, "turn": turn_number})
+        elif kind == "answer":
+            answer_parts.append(payload)
+            emit("answer_delta", {"text": payload})
+        elif kind == "final":
+            message = payload
+    return "".join(reasoning_parts), "".join(answer_parts), message
+
+
 def run_tool_loop(
     *,
     agent,
@@ -78,18 +101,31 @@ def run_tool_loop(
 
         result.turns = turn_index + 1
         system_prompt = build_system_prompt(tools_prompt_native, tools_prompt_text)
+        use_stream = hasattr(agent, "stream_chat_with_tools")
 
         try:
-            response = agent.chat_with_tools(
-                history,
-                tools=native_tools if tools_prompt_native else None,
-                system_prompt=system_prompt,
-                tool_choice="auto",
-                extra_headers=extra_headers,
-            )
-            message = response.choices[0].message
+            if use_stream:
+                reasoning_text, answer_text, message = _consume_stream_turn(
+                    agent,
+                    history,
+                    native_tools if tools_prompt_native else None,
+                    system_prompt,
+                    extra_headers,
+                    emit,
+                    turn_index + 1,
+                )
+            else:
+                response = agent.chat_with_tools(
+                    history,
+                    tools=native_tools if tools_prompt_native else None,
+                    system_prompt=system_prompt,
+                    tool_choice="auto",
+                    extra_headers=extra_headers,
+                )
+                message = response.choices[0].message
+                reasoning_text, answer_text = "", ""
         except TypeError:
-            # Some agents do not accept extra_headers
+            # Some agents do not accept extra_headers or streaming kwargs
             response = agent.chat_with_tools(
                 history,
                 tools=native_tools if tools_prompt_native else None,
@@ -97,6 +133,8 @@ def run_tool_loop(
                 tool_choice="auto",
             )
             message = response.choices[0].message
+            use_stream = False
+            reasoning_text, answer_text = "", ""
         except Exception as exc:
             error_text = str(exc)
             if tools_prompt_native and ("tool" in error_text.lower() or "400" in error_text):
@@ -112,13 +150,18 @@ def run_tool_loop(
         tool_calls, assistant_text = parse_tool_calls(message)
 
         # 中转站把模型思考链放在独立字段或 <think> 标签里，统一转成思考事件
-        reasoning = extract_reasoning(message)
-        cleaned_text = assistant_text or ""
+        reasoning = reasoning_text or extract_reasoning(message)
+        cleaned_text = answer_text if use_stream else (assistant_text or "")
         if not reasoning:
             embedded, cleaned_text = split_think_tags(cleaned_text)
             reasoning = embedded
         if reasoning:
-            thought = {"title": f"模型思考（第 {turn_index + 1} 轮）", "content": reasoning, "source": "model"}
+            thought = {
+                "title": f"模型思考（第 {turn_index + 1} 轮）",
+                "content": reasoning,
+                "source": "model",
+                "streamed": bool(use_stream),
+            }
             result.thoughts.append(thought)
             emit("thought", thought)
 

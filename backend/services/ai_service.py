@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from openai import OpenAI
 
 from django.conf import settings
@@ -159,6 +161,83 @@ class AIService:
         )
         text = response.content[0].text if response.content else ""
         return _CompatResponse(text)
+
+    def stream_chat_with_tools(
+        self,
+        messages,
+        tools=None,
+        system_prompt=None,
+        tool_choice="auto",
+        temperature=None,
+        max_tokens=None,
+        extra_headers=None,
+    ):
+        """流式调用中转站：思考链与正文逐字产出。
+
+        yields ("reasoning", text) / ("answer", text) / ("final", message)。
+        final 事件带完整 message（含工具调用），供非流式解析路径复用。
+        """
+        system_prompt = system_prompt or DEFAULT_CONTENT_SYSTEM_PROMPT
+        request_messages = [{"role": "system", "content": system_prompt}]
+        request_messages.extend(normalize_messages(messages))
+
+        if not self._use_openai:
+            response = self.chat_with_tools(
+                messages,
+                tools=tools,
+                system_prompt=system_prompt,
+                tool_choice=tool_choice,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                extra_headers=extra_headers,
+            )
+            text = response.choices[0].message.content or ""
+            if text:
+                yield ("answer", text)
+            yield ("final", response.choices[0].message)
+            return
+
+        kwargs = {
+            "model": self.model,
+            "messages": request_messages,
+            "temperature": self.temperature if temperature is None else temperature,
+            "max_tokens": self.max_tokens if max_tokens is None else max_tokens,
+            "stream": True,
+            "stream_options": {"include_usage": False},
+        }
+        if extra_headers:
+            kwargs["extra_headers"] = extra_headers
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = tool_choice
+
+        stream = self.client.chat.completions.create(**kwargs)
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta is None:
+                continue
+            reasoning_delta = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
+            if isinstance(reasoning_delta, str) and reasoning_delta:
+                yield ("reasoning", reasoning_delta)
+            if delta.content:
+                yield ("answer", delta.content)
+            finish = getattr(chunk.choices[0], "finish_reason", None)
+            if finish and finish != "stop":
+                # 工具调用轮次：流结束后回退到非流式结果解析
+                final = self.chat_with_tools(
+                    messages,
+                    tools=tools,
+                    system_prompt=system_prompt,
+                    tool_choice=tool_choice,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    extra_headers=extra_headers,
+                )
+                yield ("final", final.choices[0].message)
+                return
+        yield ("final", SimpleNamespace(content=""))
 
     def test_connection(self):
         return self.test_connection_details()["success"]

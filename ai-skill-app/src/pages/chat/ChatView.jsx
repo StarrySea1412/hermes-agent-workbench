@@ -77,6 +77,7 @@ export default function ChatView() {
   }
 
   const handleSend = async (content) => {
+    const startedAt = Date.now()
     const userMessage = { id: `local-user-${Date.now()}`, role: 'user', content }
     const assistantId = `local-assistant-${Date.now()}`
     const initialMessages = [
@@ -164,6 +165,46 @@ export default function ChatView() {
             }
           })
         },
+        onThoughtDelta: (payload) => {
+          setDraft((current) => {
+            const currentMessages = current?.messages || initialMessages
+            return {
+              conversationId: String(targetConvId),
+              messages: currentMessages.map((message) => {
+                if (message.id !== assistantId) return message
+                const thoughts = message.metadata?.thoughts || []
+                const text = payload.text || ''
+                const last = thoughts[thoughts.length - 1]
+                if (last?.source === 'model') {
+                  const merged = { ...last, content: (last.content || '') + text }
+                  return {
+                    ...message,
+                    metadata: { ...(message.metadata || {}), thoughts: [...thoughts.slice(0, -1), merged] }
+                  }
+                }
+                return {
+                  ...message,
+                  metadata: {
+                    ...(message.metadata || {}),
+                    thoughts: [...thoughts, { title: '模型思考', content: text, source: 'model' }]
+                  }
+                }
+              })
+            }
+          })
+        },
+        onAnswerDelta: (payload) => {
+          setDraft((current) => {
+            const currentMessages = current?.messages || initialMessages
+            const text = payload.text || ''
+            return {
+              conversationId: String(targetConvId),
+              messages: currentMessages.map((message) => (
+                message.id === assistantId ? { ...message, content: (message.content || '') + text } : message
+              ))
+            }
+          })
+        },
         onToolCall: (toolCall) => {
           setDraft((current) => {
             const currentMessages = current?.messages || initialMessages
@@ -225,12 +266,14 @@ export default function ChatView() {
               messages: currentMessages.map((message) => {
                 if (message.id !== assistantId) return message
                 const fallbackText = '生成完成，但没有收到可显示内容。请稍后重试或检查模型连接。'
+                const elapsed = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
                 return {
                   ...message,
                   content: message.content || payload?.reply || fallbackText,
                   metadata: {
                     ...(message.metadata || {}),
                     ...(payload?.metadata || {}),
+                    thinking_seconds: elapsed,
                   }
                 }
               })

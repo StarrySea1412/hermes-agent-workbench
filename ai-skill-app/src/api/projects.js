@@ -109,6 +109,8 @@ export async function streamMessage(conversationId, data, handlers = {}) {
       if (!parsed) return
       if (parsed.event === 'status') handlers.onStatus?.(parsed.data)
       if (parsed.event === 'thought') handlers.onThought?.(parsed.data)
+      if (parsed.event === 'thought_delta') handlers.onThoughtDelta?.(parsed.data)
+      if (parsed.event === 'answer_delta') handlers.onAnswerDelta?.(parsed.data)
       if (parsed.event === 'tool_call') handlers.onToolCall?.(parsed.data)
       if (parsed.event === 'tool_result') handlers.onToolResult?.(parsed.data)
       if (parsed.event === 'delta') handlers.onDelta?.(parsed.data.content || '')

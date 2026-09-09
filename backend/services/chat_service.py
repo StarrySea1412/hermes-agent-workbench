@@ -494,9 +494,14 @@ class ChatService:
         gateway_label,
         agent_run=None,
     ):
+        """真流式：tool_loop 在后台线程跑，事件实时经队列透传为 SSE。"""
+        import queue
+        import threading
+
         file_prompt = self._build_file_prompt(files)
         extra_headers = {"X-Hermes-Session-Id": session_id} if gateway_label == "compat" and session_id else None
-        pending_events = []
+        event_queue: queue.Queue = queue.Queue()
+        DONE = object()
 
         def build_system_prompt(native_tools_enabled, tools_prompt_text):
             return self._build_system_prompt(
@@ -506,7 +511,7 @@ class ChatService:
             )
 
         def on_event(event_type, payload):
-            pending_events.append((event_type, payload))
+            event_queue.put((event_type, payload))
             if event_type == "thought":
                 thoughts.append(payload)
             elif event_type == "tool_call" and payload not in tool_events:
@@ -522,18 +527,40 @@ class ChatService:
             "run_id": getattr(agent_run, "id", None),
         }
 
-        loop_result = run_tool_loop(
-            agent=agent,
-            history=history,
-            tool_names=tool_names,
-            build_system_prompt=build_system_prompt,
-            tool_context=tool_context,
-            max_turns=MAX_HERMES_TURNS,
-            extra_headers=extra_headers,
-            on_event=on_event,
-        )
+        def run_loop():
+            try:
+                loop_result = run_tool_loop(
+                    agent=agent,
+                    history=history,
+                    tool_names=tool_names,
+                    build_system_prompt=build_system_prompt,
+                    tool_context=tool_context,
+                    max_turns=MAX_HERMES_TURNS,
+                    extra_headers=extra_headers,
+                    on_event=on_event,
+                )
+                event_queue.put(("__result__", loop_result))
+            except Exception as exc:
+                event_queue.put(("__error__", exc))
+            finally:
+                event_queue.put(DONE)
 
-        for event_type, payload in pending_events:
+        worker = threading.Thread(target=run_loop, daemon=True)
+        worker.start()
+
+        loop_result = None
+        stream_error = None
+        while True:
+            item = event_queue.get()
+            if item is DONE:
+                break
+            event_type, payload = item
+            if event_type == "__result__":
+                loop_result = payload
+                continue
+            if event_type == "__error__":
+                stream_error = payload
+                continue
             if event_type == "status":
                 yield "status", {
                     "stage": payload.get("stage") or "tool_fallback",
@@ -543,10 +570,19 @@ class ChatService:
                 }
             elif event_type == "thought":
                 yield "thought", payload
+            elif event_type == "thought_delta":
+                yield "thought_delta", payload
+            elif event_type == "answer_delta":
+                yield "answer_delta", payload
             elif event_type == "tool_call":
                 yield "tool_call", payload
             elif event_type == "tool_result":
                 yield "tool_result", payload
+
+        if stream_error is not None:
+            raise stream_error
+        if loop_result is None:
+            raise RuntimeError("Tool loop finished without a result.")
 
         for name in loop_result.used_tools:
             if name not in used_tools:
