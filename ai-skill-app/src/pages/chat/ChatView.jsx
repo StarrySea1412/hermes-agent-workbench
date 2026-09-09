@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -15,20 +15,36 @@ import InsightPanel from '../../components/chat/InsightPanel'
 import MessageList from '../../components/chat/MessageList'
 import { useAuth } from '../../hooks/useAuth'
 import { useAIConfig } from '../../hooks/useAIConfig'
+import {
+  clearChatDraft,
+  getChatDraftSnapshot,
+  getChatNotice,
+  setChatDraft,
+  setChatNotice,
+  setChatPending,
+  setChatSending,
+  subscribeChatDraft,
+} from './chatDraftStore'
 import './ChatShell.css'
 import './ChatView.css'
+
+function useChatDraft() {
+  return useSyncExternalStore(subscribeChatDraft, getChatDraftSnapshot, getChatDraftSnapshot)
+}
+
+function useChatNotice() {
+  return useSyncExternalStore(subscribeChatDraft, getChatNotice, () => '')
+}
 
 export default function ChatView() {
   const { convId } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, logout, isLocalMode } = useAuth()
-  const [draft, setDraft] = useState(null)
-  const [pendingId, setPendingId] = useState(null)
-  const [isSending, setIsSending] = useState(false)
-  const [notice, setNotice] = useState('')
+  const { draft, pendingId, isSending } = useChatDraft()
   const [copyState, setCopyState] = useState('')
   const [runtimeOpen, setRuntimeOpen] = useState(false)
+  const notice = useChatNotice()
   const { data: aiConfig } = useAIConfig()
 
   const { data: conversations = [] } = useQuery({
@@ -63,7 +79,7 @@ export default function ChatView() {
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
       queryClient.removeQueries({ queryKey: ['conversation', String(deletedId)] })
       if (String(deletedId) === String(convId)) {
-        setDraft(null)
+        clearChatDraft()
         navigate('/', { replace: true })
       }
     }
@@ -98,10 +114,10 @@ export default function ChatView() {
       }
     ]
 
-    setDraft({ conversationId: String(convId), messages: initialMessages })
-    setPendingId(assistantId)
-    setIsSending(true)
-    setNotice('')
+    setChatDraft({ conversationId: String(convId), messages: initialMessages })
+    setChatPending(assistantId)
+    setChatSending(true)
+    setChatNotice('')
 
     try {
       let targetConvId = convId
@@ -112,14 +128,14 @@ export default function ChatView() {
           description: content.slice(0, 120)
         })
         targetConvId = created.id
-        setDraft({ conversationId: String(created.id), messages: initialMessages })
+        setChatDraft({ conversationId: String(created.id), messages: initialMessages })
         queryClient.invalidateQueries({ queryKey: ['conversations'] })
         navigate(`/chat/${created.id}`, { replace: true })
       }
 
       await streamMessage(targetConvId, { content }, {
         onStatus: (status) => {
-          setDraft((current) => {
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             return {
               conversationId: String(targetConvId),
@@ -143,11 +159,11 @@ export default function ChatView() {
             }
           })
           if (status.message) {
-            setNotice(buildRuntimeNotice(status))
+            setChatNotice(buildRuntimeNotice(status))
           }
         },
         onThought: (thought) => {
-          setDraft((current) => {
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             return {
               conversationId: String(targetConvId),
@@ -166,7 +182,7 @@ export default function ChatView() {
           })
         },
         onThoughtDelta: (payload) => {
-          setDraft((current) => {
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             return {
               conversationId: String(targetConvId),
@@ -194,7 +210,7 @@ export default function ChatView() {
           })
         },
         onAnswerDelta: (payload) => {
-          setDraft((current) => {
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             const text = payload.text || ''
             return {
@@ -206,7 +222,7 @@ export default function ChatView() {
           })
         },
         onToolCall: (toolCall) => {
-          setDraft((current) => {
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             return {
               conversationId: String(targetConvId),
@@ -226,7 +242,7 @@ export default function ChatView() {
           })
         },
         onToolResult: (toolResult) => {
-          setDraft((current) => {
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             return {
               conversationId: String(targetConvId),
@@ -248,7 +264,7 @@ export default function ChatView() {
           })
         },
         onDelta: (delta) => {
-          setDraft((current) => {
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             return {
               conversationId: String(targetConvId),
@@ -259,7 +275,7 @@ export default function ChatView() {
           })
         },
         onDone: (payload) => {
-          setDraft((current) => {
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             return {
               conversationId: String(targetConvId),
@@ -279,15 +295,15 @@ export default function ChatView() {
               })
             }
           })
-          setNotice('')
+          setChatNotice('')
           queryClient.invalidateQueries({ queryKey: ['conversation', String(targetConvId)] })
           queryClient.invalidateQueries({ queryKey: ['conversations'] })
         },
         onError: (payload) => {
           const errorNotice = buildChatErrorNotice(payload)
           const errorText = formatAssistantError(errorNotice)
-          setNotice(errorNotice)
-          setDraft((current) => {
+          setChatNotice(errorNotice)
+          setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
             return {
               conversationId: String(targetConvId),
@@ -309,10 +325,10 @@ export default function ChatView() {
         }
       })
     } catch (error) {
-      setNotice(buildChatErrorNotice(error.payload || error))
+      setChatNotice(buildChatErrorNotice(error.payload || error))
     } finally {
-      setPendingId(null)
-      setIsSending(false)
+      setChatPending(null)
+      setChatSending(false)
     }
   }
 
@@ -320,7 +336,7 @@ export default function ChatView() {
     const selectedFiles = Array.from(files || [])
     if (!selectedFiles.length) return
 
-    setNotice(conversation?.project?.id ? '正在上传资料...' : '正在创建会话并上传资料...')
+    setChatNotice(conversation?.project?.id ? '正在上传资料...' : '正在创建会话并上传资料...')
     try {
       let targetConversation = conversation
       if (!targetConversation?.project?.id) {
@@ -333,11 +349,11 @@ export default function ChatView() {
       }
 
       await uploadProjectFiles(targetConversation.project.id, selectedFiles)
-      setNotice('资料已加入当前会话。')
+      setChatNotice('资料已加入当前会话。')
       queryClient.invalidateQueries({ queryKey: ['conversation', String(targetConversation.id)] })
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     } catch (error) {
-      setNotice(error.message || '上传失败。')
+      setChatNotice(error.message || '上传失败。')
     }
   }
 
