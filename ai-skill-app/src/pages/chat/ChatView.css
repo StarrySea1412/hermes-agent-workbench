@@ -1517,6 +1517,16 @@
 
 /* ---------------- 响应式 ---------------- */
 
+@media (max-width: 1180px) {
+  .chat-app .message-list-wrap.with-timeline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-app .chat-timeline {
+    display: none;
+  }
+}
+
 @media (max-width: 1180px) and (min-width: 981px) {
   .chat-app.chat-app {
     grid-template-columns: 240px minmax(0, 1fr);
@@ -1530,14 +1540,6 @@
   .chat-app .insight-subtitle,
   .chat-app .studio-setting-row p {
     font-size: 11px;
-  }
-
-  .chat-app .message-list-wrap.with-timeline {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .chat-app .chat-timeline {
-    display: none;
   }
 }
 
