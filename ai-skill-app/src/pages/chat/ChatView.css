@@ -113,9 +113,9 @@
   align-items: center;
   gap: 14px;
   min-width: 0;
-  padding: 8px 16px;
-  border-bottom: 1px solid #d9e1ea;
-  background: #f8fafc;
+  padding: 7px 20px;
+  border-bottom: 1px solid #edf1f5;
+  background: #ffffff;
 }
 
 .chat-app .task-overview-head {
@@ -170,10 +170,10 @@
   min-width: 0;
   min-height: 0;
   flex: 1 1 0;
-  padding: 6px 10px;
-  border: 1px solid #d9e1ea;
-  border-radius: 8px;
-  background: #ffffff;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
 }
 
 .chat-app .task-card span {
@@ -200,12 +200,12 @@
 
 .chat-app .task-card-action {
   flex: 0 0 auto;
-  min-height: 26px;
-  padding: 3px 9px;
-  border: 1px solid #c7d7ec;
-  border-radius: 8px;
-  color: #164e8f;
-  background: #edf5ff;
+  min-height: 24px;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 6px;
+  color: #1f5fd0;
+  background: transparent;
   font-size: 12px;
   font-weight: 800;
 }
@@ -238,11 +238,13 @@
   display: none;
 }
 
+/* Codex 风格：思考区是浅底色块，无独立边框 */
 .chat-app .thought-panel {
-  margin: 0 0 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
+  margin: 0 0 8px;
+  border: 0;
+  border-left: 2px solid #e2d9f8;
+  border-radius: 0;
+  background: #faf9fe;
   overflow: hidden;
 }
 
@@ -278,8 +280,8 @@
   display: grid;
   gap: 8px;
   max-height: 260px;
-  padding: 4px 10px 10px;
-  border-top: 1px solid #e2e8f0;
+  padding: 4px 10px 10px 12px;
+  border-top: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   animation: thought-reveal 0.28s ease;
@@ -325,10 +327,10 @@
 }
 
 .chat-app .thought-waiting span {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 999px;
-  background: #c084fc;
+  background: #a78bfa;
   animation: thought-bounce 1.2s ease-in-out infinite;
 }
 
@@ -353,11 +355,11 @@
 
 .chat-app .type-caret {
   display: inline-block;
-  width: 7px;
-  height: 14px;
+  width: 6px;
+  height: 13px;
   margin-left: 2px;
   vertical-align: -2px;
-  border-radius: 2px;
+  border-radius: 1px;
   background: #7e22ce;
   animation: caret-blink 0.9s steps(1) infinite;
 }
@@ -371,33 +373,31 @@
   }
 }
 
+/* 思考条目：无边框盒子，左对齐浅紫标题 */
 .chat-app .thought-item {
   display: grid;
-  gap: 3px;
-  padding: 8px 10px;
-  border-left: 3px solid #93c5fd;
-  border-radius: 6px;
-  background: #ffffff;
+  gap: 2px;
+  padding: 0;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
-.chat-app .thought-item.model {
-  border-left-color: #c084fc;
+.chat-app .thought-item strong {
+  color: #7c6ba8;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .chat-app .thought-item.model strong {
   color: #7e22ce;
 }
 
-.chat-app .thought-item strong {
-  color: #1e40af;
-  font-size: 12px;
-}
-
 .chat-app .thought-item p {
   margin: 0;
-  color: #475569;
+  color: #6b6b80;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .chat-app .message-list {
@@ -454,26 +454,46 @@
 
 .chat-app .message-bubble {
   display: grid;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
-  padding: 13px 15px;
-  border: 1px solid #d9e1ea;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
+/* Codex 风格：助手回答直接排在底色上，无卡片壳 */
+.chat-app .message-row.assistant .message-bubble {
+  padding: 0;
+}
+
+/* 用户消息保留一个轻量气泡以区分说话人 */
 .chat-app .message-row.user .message-bubble {
-  border-color: #c7d7ec;
-  background: #f3f8ff;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: #eef4ff;
+  box-shadow: none;
 }
 
 .chat-app .message-role {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 800;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
   line-height: 1.2;
   text-transform: none;
+}
+
+.chat-app .message-row.assistant .message-role {
+  display: none;
+}
+
+.chat-app .message-runtime {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
 }
 
 .chat-app .message-runtime {
@@ -741,11 +761,11 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
-  min-height: 68px;
-  padding: 10px;
-  border: 1px solid #c7d7ec;
-  border-radius: 8px;
-  background: #f3f8ff;
+  min-height: 60px;
+  padding: 9px 10px;
+  border: 1px solid #e3ebf3;
+  border-radius: 10px;
+  background: #fbfdff;
 }
 
 .chat-app .message-artifact-format {

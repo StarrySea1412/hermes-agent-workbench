@@ -9,13 +9,31 @@
 .chat-app .chat-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
-  padding: 18px 14px;
+  padding: 14px 14px;
   overflow: hidden;
   color: #f8fbff;
   background: var(--sidebar);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 侧栏锁一屏：导航/状态区禁收缩，历史会话列表内部滚动 */
+.chat-app .chat-sidebar > .sidebar-mobile-row,
+.chat-app .chat-sidebar > .new-chat-btn,
+.chat-app .chat-sidebar > .sidebar-nav,
+.chat-app .chat-sidebar > .sidebar-hermes,
+.chat-app .chat-sidebar > .history-title,
+.chat-app .chat-sidebar > .sidebar-mini-nav,
+.chat-app .chat-sidebar > .sidebar-user {
+  flex: 0 0 auto;
+}
+
+.chat-app .chat-sidebar > .conversation-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .chat-app .sidebar-mobile-row,
@@ -95,7 +113,7 @@
 }
 
 .chat-app .new-chat-btn {
-  min-height: 44px;
+  min-height: 38px;
   width: 100%;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -107,13 +125,13 @@
 .chat-app .sidebar-nav,
 .chat-app .conversation-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-height: 0;
 }
 
 .chat-app .sidebar-nav-link {
   display: block;
-  padding: 10px 12px;
+  padding: 7px 11px;
   border: 1px solid transparent;
   border-radius: 8px;
   color: #dfe8f6;
@@ -129,7 +147,7 @@
 }
 
 .chat-app .sidebar-hermes {
-  padding: 12px;
+  padding: 9px 11px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
