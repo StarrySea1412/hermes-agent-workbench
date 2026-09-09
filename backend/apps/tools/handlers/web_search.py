@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 META = {
     "source": "builtin",
     "runtime": "network",
-    "notes": "Uses Brave Search when BRAVE_SEARCH_API_KEY is set, otherwise SerpAPI when SERPAPI_API_KEY is set.",
+    "notes": "Prefers Brave Search / SerpAPI when their keys are set; otherwise falls back to the keyless DuckDuckGo (ddgs) backend.",
 }
 
 SCHEMA = {
@@ -55,10 +55,15 @@ def handle(args, context=None):
             results = _search_serpapi(query, top_k, serpapi_key)
             provider = "serpapi"
         else:
-            return {
-                "ok": False,
-                "error": "No web search provider is configured. Set BRAVE_SEARCH_API_KEY or SERPAPI_API_KEY.",
-            }
+            # 免 key 兜底：ddgs（DuckDuckGo）。未安装时报可操作的错误而不是哑失败。
+            try:
+                results = _search_ddgs(query, top_k)
+                provider = "ddgs"
+            except ImportError:
+                return {
+                    "ok": False,
+                    "error": "No web search provider is configured. Set BRAVE_SEARCH_API_KEY or SERPAPI_API_KEY, or install the 'ddgs' package for keyless search.",
+                }
     except Exception as exc:
         return {"ok": False, "error": f"Web search failed: {exc}"}
 
@@ -70,6 +75,21 @@ def handle(args, context=None):
             "results": results,
         },
     }
+
+
+def _search_ddgs(query, top_k):
+    """免 key 的 DuckDuckGo 搜索，作为未配置商业 provider 时的兜底。"""
+    from ddgs import DDGS
+
+    raw = DDGS().text(query, max_results=top_k)
+    return [
+        {
+            "title": item.get("title") or "",
+            "url": item.get("href") or item.get("url") or "",
+            "snippet": item.get("body") or item.get("description") or "",
+        }
+        for item in raw[:top_k]
+    ]
 
 
 def _search_brave(query, top_k, api_key):

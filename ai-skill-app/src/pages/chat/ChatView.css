@@ -288,6 +288,107 @@
   word-break: break-word;
 }
 
+/* ---------------- 任务清单（Codex 风格计划） ---------------- */
+
+.chat-app .task-checklist {
+  margin: 0 0 10px;
+  border-left: 2px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.chat-app .task-checklist.running {
+  border-left-color: var(--thinking);
+}
+
+.chat-app .task-checklist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px 0;
+}
+
+.chat-app .task-checklist-label {
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chat-app .task-checklist-label.shimmer {
+  background: linear-gradient(90deg, #6f62c2 25%, #b3a8e8 50%, #6f62c2 75%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thought-shimmer 1.6s linear infinite;
+}
+
+.chat-app .task-checklist-head small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.chat-app .task-checklist-body {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 10px 9px 12px;
+  list-style: none;
+}
+
+.chat-app .task-checklist-body li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.chat-app .task-checklist-body li.active {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.chat-app .task-checklist-body li.done {
+  color: var(--muted-strong);
+}
+
+.chat-app .task-checklist-mark {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: #ffffff;
+  background: transparent;
+}
+
+.chat-app .task-checklist-body li.done .task-checklist-mark {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.chat-app .task-checklist-body li.active .task-checklist-mark {
+  border-color: #6f62c2;
+}
+
+.chat-app .task-checklist-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #6f62c2;
+  animation: pulse 1s infinite ease-in-out;
+}
+
+.chat-app .task-checklist-text {
+  min-width: 0;
+}
+
 .chat-app .message-list {
   display: grid;
   align-content: start;
@@ -298,6 +399,139 @@
   overflow: auto;
   padding: 20px clamp(16px, 3vw, 36px) 28px;
   background: var(--bg);
+}
+
+/* 消息跳转高亮 */
+.chat-app .message-row.flash {
+  animation: message-flash 1.2s ease;
+}
+
+@keyframes message-flash {
+  0% {
+    background: var(--active);
+    border-radius: var(--radius-lg);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* ---------------- 对话节点导航 ---------------- */
+
+.chat-app .message-list-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chat-app .message-list-wrap.with-timeline {
+  grid-template-columns: minmax(0, 1fr) 200px;
+}
+
+.chat-app .chat-timeline {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--sidebar);
+}
+
+.chat-app .chat-timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 8px;
+}
+
+.chat-app .chat-timeline-head span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.chat-app .chat-timeline-toggle {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.chat-app .chat-timeline-toggle:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.chat-app .chat-timeline-list {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  margin: 0;
+  padding: 0 8px 12px;
+  list-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.chat-app .chat-timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--muted-strong);
+  background: transparent;
+  font-size: 11.5px;
+  text-align: left;
+}
+
+.chat-app .chat-timeline-item:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.chat-app .chat-timeline-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--surface-strong);
+}
+
+.chat-app .chat-timeline-item.user .chat-timeline-icon {
+  color: var(--muted-strong);
+}
+
+.chat-app .chat-timeline-item.tool .chat-timeline-icon {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.chat-app .chat-timeline-item.answer .chat-timeline-icon {
+  color: var(--link);
+  background: var(--info-soft);
+}
+
+.chat-app .chat-timeline-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-app .message-row {
@@ -1296,6 +1530,14 @@
   .chat-app .insight-subtitle,
   .chat-app .studio-setting-row p {
     font-size: 11px;
+  }
+
+  .chat-app .message-list-wrap.with-timeline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-app .chat-timeline {
+    display: none;
   }
 }
 

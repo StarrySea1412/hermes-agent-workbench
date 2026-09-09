@@ -107,6 +107,12 @@ def run_tool_loop(
 
         result.turns = turn_index + 1
         system_prompt = build_system_prompt(tools_prompt_native, tools_prompt_text)
+        if budget_step:
+            # 加大预算的同时纠正模型行为：只加 token 它会全部继续烧在思考上
+            system_prompt += (
+                "\n\n[系统提醒] 上一轮你只输出了思考过程，没有输出任何可见正文。"
+                "请立即停止思考，把结论整理成最终回答的正文直接输出。"
+            )
         use_stream = hasattr(agent, "stream_chat_with_tools")
         retry_budget = (8192, 16384)[budget_step - 1] if budget_step else None
 

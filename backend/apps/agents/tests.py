@@ -35,7 +35,20 @@ class SkillLoaderTests(SimpleTestCase):
 
 class ToolHandlerTests(SimpleTestCase):
     @patch.dict("os.environ", {}, clear=True)
-    def test_web_search_returns_clear_error_without_provider(self):
+    @patch(
+        "apps.tools.handlers.web_search._search_ddgs",
+        return_value=[{"title": "t", "url": "https://example.com", "snippet": "s"}],
+    )
+    def test_web_search_falls_back_to_keyless_ddgs(self, mock_ddgs):
+        result = web_search.handle({"query": "hermes agent workbench"})
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["result"]["provider"], "ddgs")
+        self.assertEqual(result["result"]["results"][0]["url"], "https://example.com")
+
+    @patch.dict("os.environ", {}, clear=True)
+    @patch("apps.tools.handlers.web_search._search_ddgs", side_effect=ImportError("ddgs"))
+    def test_web_search_reports_config_error_when_no_backend(self, mock_ddgs):
         result = web_search.handle({"query": "hermes agent workbench"})
 
         self.assertFalse(result["ok"])

@@ -13,6 +13,7 @@ export default function MessageBubble({ message, pending }) {
   const thinkBodyRef = useRef(null)
   const thinkingActive = pending && !answer
   const thoughtCount = thoughts.length + (inlineThink ? 1 : 0)
+  const checklist = isUser ? null : buildTaskChecklist({ pending, thoughts, toolEvents, answer })
 
   useEffect(() => {
     if (pending && thinkBodyRef.current) {
@@ -21,12 +22,14 @@ export default function MessageBubble({ message, pending }) {
   }, [thoughts.length, pending])
 
   return (
-    <article className={`message-row ${isUser ? 'user' : 'assistant'}`}>
+    <article className={`message-row ${isUser ? 'user' : 'assistant'}`} id={`msg-${message.id}`}>
       <div className="message-avatar" aria-hidden="true">
         {isUser ? <Icon name="user" size={13} /> : <Icon name="spark" size={14} strokeWidth={1.8} />}
       </div>
       <div className="message-bubble">
         <div className="message-role">{isUser ? '你' : 'Hermes'}</div>
+
+        {checklist ? <TaskChecklist steps={checklist} /> : null}
 
         {!isUser && thoughtCount || thinkingActive ? (
           <section className={`thought-panel ${thinkingActive ? 'thinking' : ''}`} aria-live="polite">
@@ -131,6 +134,53 @@ export default function MessageBubble({ message, pending }) {
       </div>
     </article>
   )
+}
+
+function buildTaskChecklist({ pending, thoughts, toolEvents, answer }) {
+  // Codex 风格任务清单：从本轮运行事实推导（理解任务 → 收集上下文 → 工具执行 → 生成回答）
+  const hasToolDone = toolEvents.some((event) => event.status === 'ok' || event.status === 'error')
+  const hasToolRunning = pending && toolEvents.some((event) => !event.status || event.status === 'running')
+
+  const steps = [
+    { key: 'understand', label: '理解任务', done: thoughts.length > 0 },
+    { key: 'context', label: '准备上下文', done: thoughts.length > 1 || hasToolDone },
+    { key: 'tools', label: toolEvents.length ? `执行工具（${toolEvents.length}）` : '执行工具', done: hasToolDone, active: hasToolRunning, skip: !toolEvents.length && !pending },
+    { key: 'answer', label: '生成回答', done: Boolean(answer) && !pending, active: pending && Boolean(answer) },
+  ]
+
+  if (!steps.some((step) => step.done || step.active)) return null
+  return steps
+}
+
+function TaskChecklist({ steps }) {
+  const visible = steps.filter((step) => !step.skip)
+  const allDone = visible.every((step) => step.done)
+  const doneCount = visible.filter((step) => step.done).length
+
+  return (
+    <section className={`task-checklist ${pendingClass(allDone)}`} aria-label="任务清单">
+      <div className="task-checklist-head">
+        <span className={`task-checklist-label ${allDone ? '' : 'shimmer'}`}>
+          {allDone ? '任务完成' : '正在执行'}
+        </span>
+        <small>{doneCount}/{visible.length}</small>
+      </div>
+      <ol className="task-checklist-body">
+        {visible.map((step) => (
+          <li key={step.key} className={step.done ? 'done' : (step.active ? 'active' : '')}>
+            <span className="task-checklist-mark" aria-hidden="true">
+              {step.done ? <Icon name="check" size={10} strokeWidth={2.4} /> : <span className="task-checklist-dot" />}
+            </span>
+            <span className="task-checklist-text">{step.label}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+function pendingClass(allDone) {
+  return allDone ? 'done' : 'running'
 }
 
 function splitThinkFromContent(content) {

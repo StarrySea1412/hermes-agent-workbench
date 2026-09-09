@@ -112,7 +112,7 @@ class ToolLoopThinkingBudgetTests(SimpleTestCase):
         calls = []
 
         def stream(*args, **kwargs):
-            calls.append(kwargs.get("max_tokens"))
+            calls.append(kwargs)
             reasoning, answer = turns[min(len(calls) - 1, len(turns) - 1)]
             if reasoning:
                 yield ("reasoning", reasoning)
@@ -129,7 +129,7 @@ class ToolLoopThinkingBudgetTests(SimpleTestCase):
             agent=agent,
             history=[{"role": "user", "content": "hi"}],
             tool_names=[],
-            build_system_prompt=lambda native, text: "",
+            build_system_prompt=lambda native, text: "BASE",
             tool_context={},
             max_turns=4,
             on_event=lambda kind, payload: events.append((kind, payload)),
@@ -140,8 +140,10 @@ class ToolLoopThinkingBudgetTests(SimpleTestCase):
         result, calls, events = self._run([("只想答案，没写完就断了。", ""), ("", "最终答案。")])
 
         self.assertEqual(result.reply, "最终答案。")
-        self.assertEqual(calls[0], None)  # 第一轮用 agent 默认预算
-        self.assertEqual(calls[1], 8192)  # 重试放大到 8192
+        self.assertEqual(calls[0].get("max_tokens"), None)  # 第一轮用 agent 默认预算
+        self.assertEqual(calls[1].get("max_tokens"), 8192)  # 重试放大到 8192
+        # 重试时系统提示必须带上"直接输出正文"的行为纠正
+        self.assertIn("直接输出", calls[1].get("system_prompt", ""))
         statuses = [payload for kind, payload in events if kind == "status"]
         self.assertTrue(any("输出预算" in item.get("message", "") for item in statuses))
 
@@ -149,11 +151,11 @@ class ToolLoopThinkingBudgetTests(SimpleTestCase):
         result, calls, _ = self._run([("思考A", ""), ("思考B", ""), ("", "答案")])
 
         self.assertEqual(result.reply, "答案")
-        self.assertEqual(calls, [None, 8192, 16384])
+        self.assertEqual([c.get('max_tokens') for c in calls], [None, 8192, 16384])
 
     def test_budget_ladder_gives_up_after_two_retries(self):
         result, calls, _ = self._run([("思考", "")])
 
         self.assertEqual(result.reply, "")
-        self.assertEqual(calls, [None, 8192, 16384])
+        self.assertEqual([c.get('max_tokens') for c in calls], [None, 8192, 16384])
         self.assertFalse(result.exhausted)
