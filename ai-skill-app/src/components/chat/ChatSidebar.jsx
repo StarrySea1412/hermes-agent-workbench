@@ -8,6 +8,7 @@ export default function ChatSidebar({
   activeId,
   onNewChat,
   onDeleteChat,
+  onRenameChat,
   deletingId,
   user,
   onLogout,
@@ -16,6 +17,8 @@ export default function ChatSidebar({
   const navigate = useNavigate()
   const location = useLocation()
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [renamingId, setRenamingId] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
   const { data: hermesMonitor } = useHermesMonitor()
   const hermesOnline = Boolean(
     hermesMonitor?.connected || (hermesMonitor?.tcp_connected && hermesMonitor?.models_connected)
@@ -24,6 +27,19 @@ export default function ChatSidebar({
     ? (hermesMonitor?.chat_degraded ? '在线 · 响应较慢' : '在线')
     : '离线'
   const isChatRoute = location.pathname === '/' || location.pathname.startsWith('/chat/')
+
+  const startRename = (item) => {
+    setRenamingId(item.id)
+    setRenameValue(item.title || '')
+  }
+
+  const commitRename = () => {
+    if (renamingId != null && renameValue.trim()) {
+      onRenameChat?.(renamingId, renameValue)
+    }
+    setRenamingId(null)
+    setRenameValue('')
+  }
 
   return (
     <aside className={`chat-sidebar ${historyOpen ? 'history-open' : ''}`}>
@@ -86,26 +102,61 @@ export default function ChatSidebar({
             key={item.id}
             className={`conversation-item-shell ${String(activeId) === String(item.id) ? 'active' : ''}`}
           >
-            <Link
-              className="conversation-item"
-              to={`/chat/${item.id}`}
-              onClick={() => setHistoryOpen(false)}
-            >
-              <span>{item.title}</span>
-              <small>{item.last_message?.content || '等待第一条消息'}</small>
-            </Link>
-            {onDeleteChat ? (
-              <button
-                type="button"
-                className="conversation-delete-btn"
-                disabled={String(deletingId || '') === String(item.id)}
-                title="删除会话"
-                aria-label={`删除 ${item.title}`}
-                onClick={() => onDeleteChat(item.id)}
+            {renamingId != null && String(renamingId) === String(item.id) ? (
+              <form
+                className="conversation-rename"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  commitRename()
+                }}
               >
-                <Icon name="trash" size={13} />
-              </button>
-            ) : null}
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={(event) => setRenameValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setRenamingId(null)
+                  }}
+                  onBlur={commitRename}
+                  aria-label="会话名称"
+                />
+              </form>
+            ) : (
+              <Link
+                className="conversation-item"
+                to={`/chat/${item.id}`}
+                onClick={() => setHistoryOpen(false)}
+              >
+                <span>{item.title}</span>
+                <small>{item.last_message?.content || '等待第一条消息'}</small>
+              </Link>
+            )}
+            <div className="conversation-item-actions">
+              {onRenameChat && renamingId == null ? (
+                <button
+                  type="button"
+                  className="conversation-action-btn"
+                  disabled={String(deletingId || '') === String(item.id)}
+                  title="重命名"
+                  aria-label={`重命名 ${item.title}`}
+                  onClick={() => startRename(item)}
+                >
+                  <Icon name="rename" size={13} />
+                </button>
+              ) : null}
+              {onDeleteChat ? (
+                <button
+                  type="button"
+                  className="conversation-action-btn danger"
+                  disabled={String(deletingId || '') === String(item.id)}
+                  title="删除会话"
+                  aria-label={`删除 ${item.title}`}
+                  onClick={() => onDeleteChat(item.id)}
+                >
+                  <Icon name="trash" size={13} />
+                </button>
+              ) : null}
+            </div>
           </div>
         ))}
 

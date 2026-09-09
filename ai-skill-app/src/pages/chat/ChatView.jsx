@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useRef, useState, useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../../components/Icon'
@@ -7,6 +7,7 @@ import {
   deleteConversation,
   getConversation,
   listConversations,
+  renameConversation,
   streamMessage,
   uploadProjectFiles,
 } from '../../api/projects'
@@ -14,6 +15,7 @@ import ChatInput from '../../components/chat/ChatInput'
 import ChatSidebar from '../../components/chat/ChatSidebar'
 import InsightPanel from '../../components/chat/InsightPanel'
 import MessageList from '../../components/chat/MessageList'
+import { EmptyChatHero } from '../../components/chat/MessageList'
 import { useAuth } from '../../hooks/useAuth'
 import { useAIConfig } from '../../hooks/useAIConfig'
 import {
@@ -47,6 +49,7 @@ export default function ChatView() {
   const [runtimeOpen, setRuntimeOpen] = useState(false)
   const notice = useChatNotice()
   const { data: aiConfig } = useAIConfig()
+  const abortRef = useRef(null)
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['conversations'],
@@ -85,6 +88,22 @@ export default function ChatView() {
     }
   })
 
+  const renameMutation = useMutation({
+    mutationFn: ({ conversationId, title }) => renameConversation(conversationId, title),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      if (convId) {
+        queryClient.invalidateQueries({ queryKey: ['conversation', String(convId)] })
+      }
+    }
+  })
+
+  const handleRenameConversation = (conversationId, title) => {
+    const trimmed = String(title || '').trim()
+    if (!trimmed || renameMutation.isPending) return
+    renameMutation.mutate({ conversationId, title: trimmed })
+  }
+
   const createWorkspace = () => {
     createMutation.mutate({
       title: '新对话',
@@ -118,6 +137,9 @@ export default function ChatView() {
     setChatPending(assistantId)
     setChatSending(true)
     setChatNotice('')
+
+    const controller = new AbortController()
+    abortRef.current = controller
 
     try {
       let targetConvId = convId
@@ -323,13 +345,34 @@ export default function ChatView() {
             }
           })
         }
-      })
+      }, { signal: controller.signal })
     } catch (error) {
-      setChatNotice(buildChatErrorNotice(error.payload || error))
+      // 用户主动停止：保留已生成的部分内容，不当作错误
+      if (error?.name === 'AbortError' || error?.name === 'CanceledError') {
+        setChatDraft((current) => {
+          const currentMessages = current?.messages || []
+          return {
+            conversationId: String(convId || ''),
+            messages: currentMessages.map((item) => (
+              item.id === assistantId && !item.content
+                ? { ...item, content: '（已停止生成。）' }
+                : item
+            ))
+          }
+        })
+        queryClient.invalidateQueries({ queryKey: ['conversation', String(convId)] })
+      } else {
+        setChatNotice(buildChatErrorNotice(error.payload || error))
+      }
     } finally {
+      abortRef.current = null
       setChatPending(null)
       setChatSending(false)
     }
+  }
+
+  const handleStop = () => {
+    abortRef.current?.abort()
   }
 
   const handleFiles = async (files) => {
@@ -373,6 +416,7 @@ export default function ChatView() {
         onNewChat={createWorkspace}
         onDeleteChat={handleDeleteConversation}
         deletingId={deleteMutation.variables}
+        onRenameChat={handleRenameConversation}
         user={user}
         onLogout={logout}
         isLocalMode={isLocalMode}
@@ -409,7 +453,7 @@ export default function ChatView() {
         </header>
 
         <div className="chat-workspace">
-          <section className="chat-thread">
+          <section className={`chat-thread ${messages.length ? '' : 'empty'}`}>
             <details className="mobile-runtime-panel">
               <summary>
                 <span>{runtime.gatewayLabel}</span>
@@ -424,6 +468,19 @@ export default function ChatView() {
               <MessageList messages={messages} pendingMessageId={pendingId} onStarter={handleSend} />
             )}
 
+            {!isLoading && !messages.length ? (
+              <EmptyChatHero onStarter={handleSend}>
+                <ChatInput
+                  hero
+                  disabled={isSending}
+                  running={isSending}
+                  onStop={handleStop}
+                  onSend={handleSend}
+                  onFiles={handleFiles}
+                />
+              </EmptyChatHero>
+            ) : null}
+
             {notice ? (
               <ChatNotice
                 notice={notice}
@@ -437,7 +494,15 @@ export default function ChatView() {
               />
             ) : null}
 
-            <ChatInput disabled={isSending} onSend={handleSend} onFiles={handleFiles} />
+            {messages.length ? (
+              <ChatInput
+                disabled={isSending}
+                running={isSending}
+                onStop={handleStop}
+                onSend={handleSend}
+                onFiles={handleFiles}
+              />
+            ) : null}
           </section>
         </div>
 

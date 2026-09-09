@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { resolveFileUrl } from '../../api/files'
 
@@ -14,6 +14,17 @@ export default function MessageBubble({ message, pending }) {
   const thinkingActive = pending && !answer
   const thoughtCount = thoughts.length + (inlineThink ? 1 : 0)
   const checklist = isUser ? null : buildTaskChecklist({ pending, thoughts, toolEvents, answer })
+  const [copyState, setCopyState] = useState('')
+
+  const copyAnswer = async () => {
+    try {
+      await navigator.clipboard.writeText(answer)
+      setCopyState('已复制')
+    } catch {
+      setCopyState('复制失败')
+    }
+    window.setTimeout(() => setCopyState(''), 1600)
+  }
 
   useEffect(() => {
     if (pending && thinkBodyRef.current) {
@@ -131,6 +142,15 @@ export default function MessageBubble({ message, pending }) {
             : <span className="typing-dot">{pending ? '正在生成...' : '没有收到可显示的回复，请重试或检查模型连接。'}</span>}
           {pending && answer ? <span className="type-caret" /> : null}
         </div>
+
+        {!isUser && !pending && answer ? (
+          <div className="message-actions">
+            <button type="button" className="message-action-btn" onClick={copyAnswer}>
+              <Icon name="copy" size={12} />
+              {copyState || '复制'}
+            </button>
+          </div>
+        ) : null}
       </div>
     </article>
   )

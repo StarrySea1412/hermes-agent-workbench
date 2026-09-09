@@ -64,18 +64,19 @@ export function deleteConversation(conversationId) {
   return client.delete(`/conversations/${conversationId}/`)
 }
 
-export function sendMessage(conversationId, data) {
-  return client.post(`/conversations/${conversationId}/messages/`, data)
+export function renameConversation(conversationId, title) {
+  return client.patch(`/conversations/${conversationId}/`, { title })
 }
 
-export async function streamMessage(conversationId, data, handlers = {}) {
+export async function streamMessage(conversationId, data, handlers = {}, options = {}) {
   const response = await fetch(`${API_BASE}/conversations/${conversationId}/stream/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...buildAuthHeaders()
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
+    signal: options.signal
   })
 
   if (!response.ok || !response.body) {

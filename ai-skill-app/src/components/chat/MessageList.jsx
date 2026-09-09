@@ -23,7 +23,28 @@ const starters = [
 
 const NODE_PREVIEW_MAX = 42
 
-export default function MessageList({ messages = [], pendingMessageId, onStarter }) {
+export function EmptyChatHero({ onStarter, children }) {
+  return (
+    <div className="chat-hero">
+      <div className="chat-hero-inner">
+        <span className="chat-hero-mark" aria-hidden="true">
+          <Icon name="spark" size={21} strokeWidth={1.8} />
+        </span>
+        <h1 className="chat-hero-title">今天推进什么？</h1>
+        {children}
+        <div className="starter-grid compact">
+          {starters.map((starter) => (
+            <button key={starter.label} type="button" onClick={() => onStarter?.(starter.prompt)}>
+              {starter.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function MessageList({ messages = [], pendingMessageId }) {
   const endRef = useRef(null)
   const listRef = useRef(null)
 
@@ -49,21 +70,7 @@ export default function MessageList({ messages = [], pendingMessageId, onStarter
   }
 
   if (!messages.length) {
-    return (
-      <div className="empty-chat">
-        <span className="empty-mark" aria-hidden="true">
-          <Icon name="spark" size={19} strokeWidth={1.8} />
-        </span>
-        <h1>今天推进什么？</h1>
-        <div className="starter-grid compact">
-          {starters.map((starter) => (
-            <button key={starter.label} type="button" onClick={() => onStarter?.(starter.prompt)}>
-              {starter.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    )
+    return null
   }
 
   return (

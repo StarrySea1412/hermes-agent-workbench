@@ -263,32 +263,67 @@
   font-weight: 600;
 }
 
-.chat-app .conversation-delete-btn {
+.chat-app .conversation-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  align-self: center;
+  margin-right: 4px;
+  opacity: 0;
+}
+
+.chat-app .conversation-item-shell:hover .conversation-item-actions,
+.chat-app .conversation-item-shell.active .conversation-item-actions {
+  opacity: 1;
+}
+
+.chat-app .conversation-action-btn {
   display: grid;
   place-items: center;
-  align-self: center;
-  width: 26px;
-  height: 26px;
-  margin-right: 6px;
+  width: 24px;
+  height: 24px;
   border: 0;
   border-radius: 6px;
   color: var(--muted);
   background: transparent;
-  opacity: 0;
 }
 
-.chat-app .conversation-item-shell:hover .conversation-delete-btn,
-.chat-app .conversation-item-shell.active .conversation-delete-btn {
-  opacity: 1;
+.chat-app .conversation-action-btn:hover {
+  color: var(--ink);
+  background: var(--active);
 }
 
-.chat-app .conversation-delete-btn:hover {
+.chat-app .conversation-action-btn.danger:hover {
   color: var(--danger);
   background: var(--danger-soft);
 }
 
-.chat-app .conversation-delete-btn:disabled {
+.chat-app .conversation-action-btn:disabled {
   opacity: 0.4;
+}
+
+.chat-app .conversation-rename {
+  padding: 4px 6px;
+}
+
+.chat-app .conversation-rename input {
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 13px;
+  outline: none;
+}
+
+@media (hover: none) {
+
+  .chat-app .conversation-item-actions,
+  .chat-app .sidebar-logout-btn {
+    opacity: 1;
+  }
 }
 
 .chat-app .sidebar-footer {

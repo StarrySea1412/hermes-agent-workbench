@@ -68,6 +68,15 @@ const icons = {
       <path d="M3 12h18M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18Z" />
     </>
   ),
+  rename: (
+    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z" />
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </>
+  ),
 }
 
 export default function Icon({ name, size = 16, strokeWidth = 1.7, className = '' }) {
