@@ -435,6 +435,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   border-left: 1px solid var(--line);
   background: var(--sidebar);
 }
@@ -464,6 +465,7 @@
   border-radius: 6px;
   color: var(--muted);
   background: transparent;
+  transition: transform 0.18s ease;
 }
 
 .chat-app .chat-timeline-toggle:hover {
@@ -471,15 +473,28 @@
   color: var(--ink);
 }
 
+.chat-app .chat-timeline-toggle .icon {
+  transition: transform 0.18s ease;
+}
+
+.chat-app .chat-timeline-toggle.collapsed .icon {
+  transform: rotate(180deg);
+}
+
 .chat-app .chat-timeline-list {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
   margin: 0;
   padding: 0 8px 12px;
   list-style: none;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
+}
+
+.chat-app .chat-timeline-list li {
+  min-width: 0;
 }
 
 .chat-app .chat-timeline-item {
@@ -487,6 +502,7 @@
   align-items: center;
   gap: 7px;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   padding: 5px 7px;
   border: 0;
@@ -528,6 +544,7 @@
 }
 
 .chat-app .chat-timeline-text {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

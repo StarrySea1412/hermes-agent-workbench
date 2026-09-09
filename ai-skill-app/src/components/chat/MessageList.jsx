@@ -78,33 +78,35 @@ export default function MessageList({ messages = [], pendingMessageId, onStarter
       {showTimeline ? (
         <nav className="chat-timeline" aria-label="对话节点">
           <div className="chat-timeline-head">
-            <span>对话节点</span>
+            <span>对话节点 · {nodes.length}</span>
             <button
               type="button"
-              className="chat-timeline-toggle"
+              className={`chat-timeline-toggle ${collapsed ? 'collapsed' : ''}`}
               title={collapsed ? '展开节点' : '收起节点'}
               onClick={() => setCollapsed((closed) => !closed)}
             >
               <Icon name="chevron" size={13} />
             </button>
           </div>
-          <ul className="chat-timeline-list">
-            {nodes.map((node) => (
-              <li key={node.messageId}>
-                <button
-                  type="button"
-                  className={`chat-timeline-item ${node.kind}`}
-                  title={node.preview}
-                  onClick={() => jumpTo(node.messageId)}
-                >
-                  <span className="chat-timeline-icon" aria-hidden="true">
-                    <Icon name={node.icon} size={11} />
-                  </span>
-                  <span className="chat-timeline-text">{node.preview}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          {!collapsed ? (
+            <ul className="chat-timeline-list">
+              {nodes.map((node) => (
+                <li key={node.messageId + node.preview}>
+                  <button
+                    type="button"
+                    className={`chat-timeline-item ${node.kind}`}
+                    title={node.preview}
+                    onClick={() => jumpTo(node.messageId)}
+                  >
+                    <span className="chat-timeline-icon" aria-hidden="true">
+                      <Icon name={node.icon} size={11} />
+                    </span>
+                    <span className="chat-timeline-text">{node.preview}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </nav>
       ) : null}
     </div>
