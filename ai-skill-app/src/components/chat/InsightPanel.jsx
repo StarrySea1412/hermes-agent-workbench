@@ -13,7 +13,7 @@ export default function InsightPanel({ project, runtime, compact = false }) {
     <section className={`insight-panel ${compact ? 'compact' : ''}`}>
       <div className="insight-header">
         <div>
-          <p className="eyebrow">运行设置</p>
+          <p className="eyebrow">模型</p>
           <h2>{modelName}</h2>
           <p className="insight-subtitle">按设置页保存的模型配置执行。</p>
         </div>

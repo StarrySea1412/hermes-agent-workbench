@@ -37,7 +37,7 @@ export default function Register() {
     <div className={styles.loginContainer}>
       <div className={styles.loginCard}>
         <div className={styles.logoArea}>
-          <span className={styles.logoText}>Hermes 工作台</span>
+          <span className={styles.logoText}>H</span>
         </div>
 
         <h1 className={styles.title}>创建账号</h1>

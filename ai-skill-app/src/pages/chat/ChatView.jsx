@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
+import Icon from '../../components/Icon'
 import {
   createConversation,
   deleteConversation,
@@ -63,7 +64,6 @@ export default function ChatView() {
     ? draft.messages
     : (conversation?.messages || [])
   const runtime = buildRuntimeSnapshot(conversation, messages, aiConfig)
-  const workspace = buildWorkspaceSummary(conversation, messages, runtime)
 
   const createMutation = useMutation({
     mutationFn: createConversation,
@@ -381,39 +381,32 @@ export default function ChatView() {
       <main className="chat-main">
         <header className="chat-header">
           <div className="chat-title-block">
-            <p className="eyebrow">Hermes</p>
-            <h1>{conversation?.title || '今天要推进什么？'}</h1>
+            <h1>{conversation?.title || '新任务'}</h1>
           </div>
           <div className="chat-header-actions">
-            <button type="button" className="ghost-button" onClick={() => setRuntimeOpen((open) => !open)}>
-              {runtimeOpen ? '收起状态' : '运行设置'}
+            <button
+              type="button"
+              className="ghost-button"
+              title="模型与运行状态"
+              onClick={() => setRuntimeOpen((open) => !open)}
+            >
+              <Icon name="spark" size={14} />
+              {runtime.modelName || '未配置模型'}
             </button>
             {convId ? (
               <button
                 type="button"
                 className="ghost-button chat-delete-button"
+                title="删除会话"
+                aria-label="删除会话"
                 disabled={deleteMutation.isPending}
                 onClick={() => handleDeleteConversation(convId)}
               >
-                删除
+                <Icon name="trash" size={14} />
               </button>
             ) : null}
-            <button type="button" className="ghost-button" onClick={() => navigate('/projects')}>
-              资料
-            </button>
-            <button type="button" className="ghost-button" onClick={() => navigate('/skills')}>
-              技能
-            </button>
           </div>
         </header>
-
-        <TaskOverview
-          workspace={workspace}
-          runtime={runtime}
-          onOpenProjects={() => navigate('/projects')}
-          onOpenSettings={() => setRuntimeOpen(true)}
-          onOpenSkills={() => navigate('/skills')}
-        />
 
         <div className="chat-workspace">
           <section className="chat-thread">
@@ -456,72 +449,13 @@ export default function ChatView() {
         />
         <aside className={`delivery-rail ${runtimeOpen ? 'open' : ''}`} aria-label="Agent 运行状态" aria-hidden={!runtimeOpen}>
           <div className="rail-head">
-            <span>运行设置</span>
+            <span>运行状态</span>
             <button type="button" className="rail-close" onClick={() => setRuntimeOpen(false)}>×</button>
           </div>
           <InsightPanel project={conversation?.project} runtime={runtime} />
         </aside>
       </main>
     </div>
-  )
-}
-
-function TaskOverview({ workspace, runtime, onOpenProjects, onOpenSettings, onOpenSkills }) {
-  const cards = [
-    {
-      label: '目标',
-      value: workspace.goal,
-      helper: workspace.phaseLabel,
-      action: null,
-    },
-    {
-      label: '资料',
-      value: `${runtime.fileCount || 0} 份`,
-      helper: workspace.fileState,
-      action: { label: '资料库', onClick: onOpenProjects },
-    },
-    {
-      label: '工具',
-      value: `${runtime.toolCount || 0} 次`,
-      helper: workspace.toolState,
-      action: { label: '技能', onClick: onOpenSkills },
-    },
-    {
-      label: '产物',
-      value: `${workspace.artifactCount} 个`,
-      helper: workspace.artifactState,
-      action: { label: '运行设置', onClick: onOpenSettings },
-    },
-  ]
-
-  return (
-    <section className="task-overview" aria-label="任务总览">
-      <div className="task-overview-head">
-        <h2>{workspace.phaseLabel}</h2>
-        <div className="task-progress" aria-label={`任务阶段：${workspace.phaseLabel}`}>
-          {workspace.phases.map((phase) => (
-            <span
-              key={phase.key}
-              className={`task-progress-step ${phase.state}`}
-              title={phase.label}
-            />
-          ))}
-        </div>
-      </div>
-      <div className="task-card-grid">
-        {cards.map((card) => (
-          <article key={card.label} className="task-card">
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
-            {card.action ? (
-              <button type="button" className="task-card-action" onClick={card.action.onClick}>
-                {card.action.label}
-              </button>
-            ) : null}
-          </article>
-        ))}
-      </div>
-    </section>
   )
 }
 
@@ -690,53 +624,6 @@ function buildRuntimeSnapshot(conversation, messages, aiConfig) {
     toolEvents,
     statusMessage: metadata.status_message || '',
   }
-}
-
-function buildWorkspaceSummary(conversation, messages, runtime) {
-  const firstUserMessage = (messages || []).find((message) => message.role === 'user')
-  const latestAssistant = [...(messages || [])].reverse().find((message) => message.role === 'assistant')
-  const toolEvents = runtime?.toolEvents || []
-  const artifactCount = collectRuntimeArtifacts(toolEvents).length
-  const hasMessages = Boolean(messages?.length)
-  const hasAssistantContent = Boolean(latestAssistant?.content)
-  const hasRunningTool = toolEvents.some((event) => !event.status || event.status === 'running')
-  const hasFiles = (runtime?.fileCount || 0) > 0
-
-  const phaseKey = !hasMessages
-    ? 'ready'
-    : hasRunningTool
-      ? 'running'
-      : hasAssistantContent || artifactCount
-        ? 'delivered'
-        : 'drafting'
-
-  const phaseLabelMap = {
-    ready: '等待任务',
-    drafting: '正在组织上下文',
-    running: '工具执行中',
-    delivered: '已有输出',
-  }
-
-  const phases = [
-    { key: 'ready', label: '任务', state: hasMessages ? 'done' : 'active' },
-    { key: 'context', label: '上下文', state: hasFiles ? 'done' : (hasMessages ? 'active' : 'idle') },
-    { key: 'tools', label: '工具', state: runtime?.toolCount ? (hasRunningTool ? 'active' : 'done') : 'idle' },
-    { key: 'delivery', label: '产物', state: artifactCount || hasAssistantContent ? 'done' : 'idle' },
-  ]
-
-  return {
-    goal: firstUserMessage?.content || conversation?.description || '尚未确定任务目标。',
-    phaseLabel: phaseLabelMap[phaseKey],
-    phases,
-    artifactCount,
-    fileState: hasFiles ? '已挂载到当前会话上下文。' : '当前会话还没有资料。',
-    toolState: runtime?.toolCount ? '工具轨迹已记录。' : '本轮还没有工具动作。',
-    artifactState: artifactCount ? '文件产物已生成。' : '等待导出类工具结果。',
-  }
-}
-
-function collectRuntimeArtifacts(toolEvents) {
-  return (toolEvents || []).filter((event) => event?.result?.result?.url)
 }
 
 function addUniqueTool(current, toolName) {

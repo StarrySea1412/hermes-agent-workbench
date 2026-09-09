@@ -1,19 +1,22 @@
 .loginContainer {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 20px;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f7f7f6;
   padding: 20px;
 }
 
 .loginCard {
   width: 100%;
-  max-width: 400px;
+  max-width: 380px;
   background: #ffffff;
-  border-radius: 16px;
-  padding: 40px 32px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid #e8e8e6;
+  border-radius: 14px;
+  padding: 36px 32px;
+  box-shadow: 0 1px 2px rgba(20, 20, 19, 0.04);
 }
 
 .logoArea {
@@ -21,7 +24,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .logoImg {
@@ -31,121 +34,126 @@
 }
 
 .logoText {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  color: #ffffff;
+  background: #141413;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .title {
   text-align: center;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 8px 0;
+  color: #141413;
+  margin: 0 0 6px 0;
 }
 
 .subtitle {
   text-align: center;
-  font-size: 14px;
-  color: #666;
-  margin: 0 0 32px 0;
+  font-size: 13px;
+  color: #8f8e8c;
+  margin: 0 0 28px 0;
+  line-height: 1.6;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
 .inputGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5c5b59;
 }
 
 .input {
   width: 100%;
-  height: 44px;
-  padding: 0 14px;
-  border: 1px solid #d9d9d9;
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid #d9d9d6;
   border-radius: 8px;
   font-size: 14px;
-  color: #333;
-  transition: all 0.3s ease;
+  color: #141413;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   outline: none;
 
   &::placeholder {
-    color: #bfbfbf;
+    color: #b5b4b2;
   }
 
   &:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+    border-color: #141413;
+    box-shadow: 0 0 0 3px rgba(20, 20, 19, 0.08);
   }
 
   &:disabled {
-    background: #f5f5f5;
+    background: #f6f6f5;
     cursor: not-allowed;
   }
 }
 
 .error {
-  padding: 12px;
-  background: #fff2f0;
-  border: 1px solid #ffccc7;
+  padding: 11px 12px;
+  background: #fbeeee;
+  border: 1px solid rgba(199, 53, 53, 0.25);
   border-radius: 8px;
-  color: #ff4d4f;
+  color: #c73535;
   font-size: 13px;
   text-align: center;
 }
 
 .submitBtn {
   width: 100%;
-  height: 44px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  height: 42px;
+  background: #141413;
   color: #ffffff;
-  border: none;
+  border: 1px solid #141413;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  margin-top: 8px;
+  transition: background 0.15s ease;
+  margin-top: 4px;
 
   &:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
+    background: #33322f;
+    border-color: #33322f;
   }
 
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 }
 
 .registerHint {
   text-align: center;
-  font-size: 14px;
-  color: #666;
-  margin: 8px 0 0 0;
+  font-size: 13px;
+  color: #8f8e8c;
+  margin: 6px 0 0 0;
 }
 
 .registerLink {
-  color: #667eea;
+  color: #141413;
   cursor: pointer;
   margin-left: 4px;
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
 
   &:hover {
     text-decoration: underline;
@@ -153,14 +161,19 @@
 }
 
 .inputError {
-  border-color: #ff4d4f !important;
+  border-color: #c73535 !important;
 
   &:focus {
-    box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.1) !important;
+    box-shadow: 0 0 0 3px rgba(199, 53, 53, 0.1) !important;
   }
 }
 
 .fieldError {
   font-size: 12px;
-  color: #ff4d4f;
+  color: #c73535;
+}
+
+.loginFooter {
+  font-size: 12px;
+  color: #b5b4b2;
 }

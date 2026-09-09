@@ -1,4 +1,6 @@
-export default function FileUploader({ disabled, onFiles }) {
+import Icon from '../Icon'
+
+export default function FileUploader({ disabled, onFiles, withIcon = false }) {
   return (
     <label className={`file-uploader ${disabled ? 'disabled' : ''}`}>
       <input
@@ -13,6 +15,7 @@ export default function FileUploader({ disabled, onFiles }) {
           }
         }}
       />
+      {withIcon ? <Icon name="paperclip" size={13} /> : null}
       <span>添加资料</span>
     </label>
   )

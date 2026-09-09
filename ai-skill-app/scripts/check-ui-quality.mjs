@@ -27,9 +27,12 @@ const checks = [
     hint: 'ChatView must keep shell styles and page styles scoped to the chat module.',
   },
   {
-    name: 'Chat workspace has task overview',
-    ok: files.chatView.includes('function TaskOverview') && files.chatView.includes('className="task-overview"'),
-    hint: 'The chat page should expose goal, files, tools, artifacts, and phase in one visible workflow.',
+    name: 'Chat workspace keeps a minimal header (no task overview strip)',
+    ok: files.chatView.includes('className="chat-title-block"') &&
+      files.chatView.includes('chat-delete-button') &&
+      !files.chatView.includes('TaskOverview') &&
+      !files.chatCss.includes('.task-overview'),
+    hint: 'The chat header should stay a single slim row (title + model chip + delete); goal/files/tools/artifacts belong in the runtime rail, not a cluttered strip.',
   },
   {
     name: 'Mobile runtime state remains available',
@@ -56,9 +59,15 @@ const checks = [
     hint: 'Chat module layout selectors belong in ChatShell.css or ChatView.css, not index.css.',
   },
   {
-    name: 'Input actions use Chinese workflow labels',
-    ok: ['规划任务', '检查问题', '生成产物', '整理资料', '任务上下文', '资料记忆', '工具执行'].every((text) => files.chatInput.includes(text)),
-    hint: 'The composer should read like a Chinese task workbench, not developer placeholder tags.',
+    name: 'Composer stays clean with Chinese workflow labels',
+    ok: files.chatInput.includes('交给 Hermes') &&
+      files.chatInput.includes('Enter 发送') &&
+      files.chatInput.includes('发送') &&
+      !files.chatInput.includes('任务上下文') &&
+      !files.chatInput.includes('资料记忆') &&
+      !files.chatInput.includes('工具执行') &&
+      !files.chatInput.includes('composer-chips'),
+    hint: 'The composer should keep a task-workbench voice (placeholder, send hint, upload) without decorative dead chips.',
   },
   {
     name: 'Runtime panel supports compact mode',

@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import Icon from '../Icon'
 import RunStatusBadge from './RunStatusBadge'
 import { useHermesMonitor } from '../../hooks/useAIConfig'
 
@@ -11,7 +12,9 @@ export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false
   return (
     <aside className="workbench-sidebar">
       <button type="button" className="sidebar-brand" onClick={() => navigate('/')}>
-        <div className="brand-badge">H</div>
+        <span className="brand-badge" aria-hidden="true">
+          <Icon name="spark" size={15} strokeWidth={1.9} />
+        </span>
         <div>
           <strong>Hermes 工作台</strong>
           <span>聊天、资料、工具与产物</span>
@@ -54,7 +57,6 @@ export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false
           </NavLink>
         </details>
       </nav>
-
       <section className="sidebar-panel">
         <div className="sidebar-panel-header">
           <span>Hermes</span>

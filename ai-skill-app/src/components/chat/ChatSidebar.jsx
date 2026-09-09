@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import Icon from '../Icon'
 import { useHermesMonitor } from '../../hooks/useAIConfig'
 
 export default function ChatSidebar({
@@ -20,7 +21,7 @@ export default function ChatSidebar({
     hermesMonitor?.connected || (hermesMonitor?.tcp_connected && hermesMonitor?.models_connected)
   )
   const hermesStatusText = hermesOnline
-    ? (hermesMonitor?.chat_degraded ? '在线，响应较慢' : '在线')
+    ? (hermesMonitor?.chat_degraded ? '在线 · 响应较慢' : '在线')
     : '离线'
   const isChatRoute = location.pathname === '/' || location.pathname.startsWith('/chat/')
 
@@ -28,11 +29,13 @@ export default function ChatSidebar({
     <aside className={`chat-sidebar ${historyOpen ? 'history-open' : ''}`}>
       <div className="sidebar-mobile-row">
         <button type="button" className="brand-block brand-button" onClick={() => navigate('/')}>
-          <div className="brand-mark">H</div>
-          <div>
+          <span className="brand-mark" aria-hidden="true">
+            <Icon name="spark" size={15} strokeWidth={1.9} />
+          </span>
+          <span className="brand-text">
             <strong>Hermes</strong>
             <span>Agent 工作台</span>
-          </div>
+          </span>
         </button>
 
         <button
@@ -45,40 +48,38 @@ export default function ChatSidebar({
       </div>
 
       <button type="button" className="new-chat-btn" onClick={onNewChat}>
+        <Icon name="plus" size={14} strokeWidth={2} />
         新任务
       </button>
 
       <nav className="sidebar-nav">
         <NavLink to="/" end className={() => `sidebar-nav-link ${isChatRoute ? 'active' : ''}`}>
+          <Icon name="chat" size={15} />
           会话
         </NavLink>
         <NavLink to="/files" className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}>
+          <Icon name="folder" size={15} />
           资料
         </NavLink>
         <NavLink to="/runs" className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}>
+          <Icon name="task" size={15} />
           任务
         </NavLink>
         <NavLink to="/skills" className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}>
+          <Icon name="book" size={15} />
           技能
         </NavLink>
         <NavLink to="/settings" className={({ isActive }) => `sidebar-nav-link ${isActive ? 'active' : ''}`}>
+          <Icon name="gear" size={15} />
           设置
         </NavLink>
       </nav>
 
-      <Link className="sidebar-hermes" to="/settings">
-        <span className={`sidebar-hermes-dot ${hermesOnline ? 'online' : 'offline'}`} />
-        <div>
-          <strong>Hermes {hermesStatusText}</strong>
-          <small>
-            {hermesMonitor?.gateway_url
-              ? `${hermesMonitor.host || 'localhost'}:${hermesMonitor.port || '8642'}`
-              : '查看 Agent 状态'}
-          </small>
-        </div>
-      </Link>
+      <div className="history-title">
+        历史会话
+        {conversations.length ? <span className="history-count">{conversations.length}</span> : null}
+      </div>
 
-      <div className="history-title">历史会话</div>
       <div className="conversation-list">
         {conversations.map((item) => (
           <div
@@ -102,7 +103,7 @@ export default function ChatSidebar({
                 aria-label={`删除 ${item.title}`}
                 onClick={() => onDeleteChat(item.id)}
               >
-                ×
+                <Icon name="trash" size={13} />
               </button>
             ) : null}
           </div>
@@ -113,35 +114,42 @@ export default function ChatSidebar({
         ) : null}
       </div>
 
-      <nav className="sidebar-mini-nav">
-        <NavLink to="/projects" className={({ isActive }) => `sidebar-mini-link ${isActive ? 'active' : ''}`}>
-          资料
-        </NavLink>
-        <NavLink to="/agent" className={({ isActive }) => `sidebar-mini-link ${isActive ? 'active' : ''}`}>
-          实验
-        </NavLink>
-        <NavLink to="/skills" className={({ isActive }) => `sidebar-mini-link ${isActive ? 'active' : ''}`}>
-          技能
-        </NavLink>
-      </nav>
+      <div className="sidebar-footer">
+        <Link className="sidebar-hermes" to="/settings" title="查看 Agent 状态">
+          <span className={`sidebar-hermes-dot ${hermesOnline ? 'online' : 'offline'}`} />
+          <span className="sidebar-hermes-text">
+            <strong>Hermes {hermesStatusText}</strong>
+            <small>
+              {hermesMonitor?.gateway_url
+                ? `${hermesMonitor.host || 'localhost'}:${hermesMonitor.port || '8642'}`
+                : '查看 Agent 状态'}
+            </small>
+          </span>
+        </Link>
 
-      <div className="sidebar-user">
-        <div>
-          <strong>{user?.display_name || user?.username || '访客'}</strong>
-          <span>{isLocalMode ? '本地模式' : user ? '已登录' : '访客模式'}</span>
+        <div className="sidebar-user">
+          <span className="sidebar-user-avatar" aria-hidden="true">
+            <Icon name="user" size={13} />
+          </span>
+          <span className="sidebar-user-text">
+            <strong>{user?.display_name || user?.username || '访客'}</strong>
+            <small>{isLocalMode ? '本地模式' : user ? '已登录' : '访客模式'}</small>
+          </span>
+          {onLogout ? (
+            <button
+              type="button"
+              className="sidebar-logout-btn"
+              title="退出登录"
+              aria-label="退出登录"
+              onClick={() => {
+                onLogout()
+                navigate('/login')
+              }}
+            >
+              <Icon name="logout" size={14} />
+            </button>
+          ) : null}
         </div>
-        {onLogout ? (
-          <button
-            type="button"
-            className="sidebar-logout-btn"
-            onClick={() => {
-              onLogout()
-              navigate('/login')
-            }}
-          >
-            退出登录
-          </button>
-        ) : null}
       </div>
     </aside>
   )

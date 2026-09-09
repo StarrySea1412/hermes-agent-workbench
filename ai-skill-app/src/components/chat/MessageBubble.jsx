@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import Icon from '../Icon'
 import { resolveFileUrl } from '../../api/files'
 
 export default function MessageBubble({ message, pending }) {
@@ -6,10 +7,7 @@ export default function MessageBubble({ message, pending }) {
   const toolEvents = Array.isArray(message.metadata?.tool_events) ? message.metadata.tool_events : []
   const thoughts = Array.isArray(message.metadata?.thoughts) ? message.metadata.thoughts : []
   const { answer, inlineThink } = splitThinkFromContent(message.content)
-  const sessionId = message.metadata?.session_id || ''
-  const gateway = message.metadata?.gateway || ''
   const statusMessage = message.metadata?.status_message || ''
-  const gatewayLabel = formatGateway(gateway)
   const artifactLinks = collectArtifactLinks(toolEvents)
   const thinkingSeconds = message.metadata?.thinking_seconds
   const thinkBodyRef = useRef(null)
@@ -24,7 +22,9 @@ export default function MessageBubble({ message, pending }) {
 
   return (
     <article className={`message-row ${isUser ? 'user' : 'assistant'}`}>
-      <div className="message-avatar">{isUser ? '你' : 'H'}</div>
+      <div className="message-avatar" aria-hidden="true">
+        {isUser ? <Icon name="user" size={13} /> : <Icon name="spark" size={14} strokeWidth={1.8} />}
+      </div>
       <div className="message-bubble">
         <div className="message-role">{isUser ? '你' : 'Hermes'}</div>
 
@@ -60,11 +60,9 @@ export default function MessageBubble({ message, pending }) {
           </section>
         ) : null}
 
-        {!isUser && (sessionId || gateway || statusMessage) ? (
+        {!isUser && statusMessage ? (
           <div className="message-runtime">
-            {gatewayLabel ? <code>{gatewayLabel}</code> : null}
-            {sessionId ? <code>{sessionId}</code> : null}
-            {statusMessage ? <small>{statusMessage}</small> : null}
+            <small>{statusMessage}</small>
           </div>
         ) : null}
 
@@ -129,8 +127,6 @@ export default function MessageBubble({ message, pending }) {
             ? renderMarkdownLite(answer)
             : <span className="typing-dot">{pending ? '正在生成...' : '没有收到可显示的回复，请重试或检查模型连接。'}</span>}
           {pending && answer ? <span className="type-caret" /> : null}
-          {!pending && answer ? null : null}
-          {pending ? <span className="cursor-pulse" /> : null}
         </div>
       </div>
     </article>
@@ -389,11 +385,4 @@ function formatToolStatus(status) {
   if (status === 'ok') return '完成'
   if (status === 'error') return '失败'
   return '执行中'
-}
-
-function formatGateway(gateway) {
-  if (gateway === 'compat') return 'Hermes 兼容链路'
-  if (gateway === 'fallback') return '本地保底答复'
-  if (gateway === 'hermes') return 'Hermes 网关'
-  return ''
 }

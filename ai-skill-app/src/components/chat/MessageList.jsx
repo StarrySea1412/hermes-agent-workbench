@@ -1,22 +1,23 @@
 import { useEffect, useRef } from 'react'
+import Icon from '../Icon'
 import MessageBubble from './MessageBubble'
 
 const starters = [
   {
-    label: '改造成 Hermes 工作台',
-    prompt: '把这个项目改成 Hermes 风格的 agent 工程师工作台：聊天优先、工具可见、记忆可追踪、操作尽量少。',
+    label: '梳理项目架构',
+    prompt: '帮我梳理这个项目的架构，并给出下一步改造建议。',
   },
   {
-    label: '诊断操作复杂度',
-    prompt: '分析当前产品哪里操作复杂，按用户路径给出改造清单，并优先处理聊天入口。',
+    label: '总结上传资料',
+    prompt: '根据上传资料，总结关键结论、风险点和后续动作。',
   },
   {
-    label: '读取资料生成路线',
-    prompt: '读取我上传的资料，提炼目标、约束、风险和下一步执行路线。',
+    label: '需求变方案',
+    prompt: '把这段需求整理成实现方案、接口设计和任务拆分。',
   },
   {
-    label: '整理开源项目文档',
-    prompt: '生成适合 agent 开发工程师开源项目的 README、路线图和贡献指南。',
+    label: '起草文档',
+    prompt: '先给我一版 README 或 PRD 草稿，我来继续补充。',
   },
 ]
 
@@ -30,8 +31,9 @@ export default function MessageList({ messages = [], pendingMessageId, onStarter
   if (!messages.length) {
     return (
       <div className="empty-chat">
-        <div className="empty-mark">H</div>
-        <p className="eyebrow">Hermes Session</p>
+        <span className="empty-mark" aria-hidden="true">
+          <Icon name="spark" size={19} strokeWidth={1.8} />
+        </span>
         <h1>今天推进什么？</h1>
         <div className="starter-grid compact">
           {starters.map((starter) => (

@@ -33,10 +33,10 @@ export default function Login() {
     <div className={styles.loginContainer}>
       <div className={styles.loginCard}>
         <div className={styles.logoArea}>
-          <span className={styles.logoText}>Hermes 工作台</span>
+          <span className={styles.logoText}>H</span>
         </div>
 
-        <h1 className={styles.title}>登录</h1>
+        <h1 className={styles.title}>登录 Hermes</h1>
         <p className={styles.subtitle}>继续查看运行记录、工具、技能和执行轨迹。</p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
