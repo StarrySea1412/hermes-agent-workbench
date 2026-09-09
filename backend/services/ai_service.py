@@ -212,32 +212,53 @@ class AIService:
             kwargs["tool_choice"] = tool_choice
 
         stream = self.client.chat.completions.create(**kwargs)
+        answer_parts = []
+        tool_call_acc = {}
+        last_finish = None
         for chunk in stream:
             if not chunk.choices:
                 continue
-            delta = chunk.choices[0].delta
-            if delta is None:
-                continue
-            reasoning_delta = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
-            if isinstance(reasoning_delta, str) and reasoning_delta:
-                yield ("reasoning", reasoning_delta)
-            if delta.content:
-                yield ("answer", delta.content)
-            finish = getattr(chunk.choices[0], "finish_reason", None)
-            if finish and finish != "stop":
-                # 工具调用轮次：流结束后回退到非流式结果解析
-                final = self.chat_with_tools(
-                    messages,
-                    tools=tools,
-                    system_prompt=system_prompt,
-                    tool_choice=tool_choice,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    extra_headers=extra_headers,
+            choice = chunk.choices[0]
+            delta = choice.delta
+            if delta is not None:
+                reasoning_delta = getattr(delta, "reasoning_content", None) or getattr(delta, "reasoning", None)
+                if isinstance(reasoning_delta, str) and reasoning_delta:
+                    yield ("reasoning", reasoning_delta)
+                if delta.content:
+                    answer_parts.append(delta.content)
+                    yield ("answer", delta.content)
+                for tc in getattr(delta, "tool_calls", None) or []:
+                    idx = tc.index if tc.index is not None else 0
+                    acc = tool_call_acc.setdefault(idx, {"id": "", "name": "", "arguments": ""})
+                    if tc.id:
+                        acc["id"] = tc.id
+                    fn = getattr(tc, "function", None)
+                    if fn is not None:
+                        if fn.name:
+                            acc["name"] = fn.name
+                        if fn.arguments:
+                            acc["arguments"] += fn.arguments
+            if choice.finish_reason:
+                last_finish = choice.finish_reason
+
+        assembled_calls = None
+        if tool_call_acc:
+            assembled_calls = [
+                SimpleNamespace(
+                    id=tool_call_acc[idx]["id"] or f"call-{idx}",
+                    function=SimpleNamespace(
+                        name=tool_call_acc[idx]["name"],
+                        arguments=tool_call_acc[idx]["arguments"] or "{}",
+                    ),
                 )
-                yield ("final", final.choices[0].message)
-                return
-        yield ("final", SimpleNamespace(content=""))
+                for idx in sorted(tool_call_acc)
+            ]
+
+        if assembled_calls and last_finish == "tool_calls":
+            yield ("final", SimpleNamespace(content="".join(answer_parts), tool_calls=assembled_calls))
+            return
+
+        yield ("final", SimpleNamespace(content="".join(answer_parts), tool_calls=None))
 
     def test_connection(self):
         return self.test_connection_details()["success"]

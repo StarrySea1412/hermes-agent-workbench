@@ -69,33 +69,38 @@ export default function MessageBubble({ message, pending }) {
         ) : null}
 
         {!isUser && toolEvents.length > 0 ? (
-          <details className="tool-panel">
-            <summary>
-              <span>工具轨迹</span>
-              <small>{pending ? '执行中' : `${toolEvents.length} 次动作`}</small>
-            </summary>
-            <div className="tool-event-list">
-              {toolEvents.map((event) => (
-                <article key={event.id || `${event.name}-${JSON.stringify(event.args || {})}`} className="tool-event-card">
-                  <div className="tool-event-top">
-                    <strong>{event.name || '工具'}</strong>
-                    <span className={`tool-event-status ${event.status || 'running'}`}>
-                      {formatToolStatus(event.status)}
+          <div className={`tool-trace ${pending ? 'running' : ''}`}>
+            {toolEvents.map((event) => {
+              const running = pending && event.status === 'running'
+              return (
+                <details key={event.id || `${event.name}-${JSON.stringify(event.args || {})}`} className="tool-trace-row">
+                  <summary>
+                    {running ? (
+                      <span className="tool-trace-spinner" aria-hidden="true" />
+                    ) : (
+                      <span className={`tool-trace-check ${event.status === 'error' ? 'failed' : ''}`} aria-hidden="true">
+                        {event.status === 'error' ? '×' : '✓'}
+                      </span>
+                    )}
+                    <span className="tool-trace-name">
+                      {running ? `正在调用 ${formatToolName(event.name || '工具')}...` : formatToolName(event.name || '工具')}
                     </span>
-                  </div>
-                  {event.thought ? <p>{event.thought}</p> : null}
-                  {event.args && Object.keys(event.args).length ? (
-                    <details className="tool-event-args">
-                      <summary>参数</summary>
+                    <small className="tool-trace-summary">
+                      {running ? '等待结果...' : (event.result_preview || formatToolStatus(event.status))}
+                    </small>
+                  </summary>
+                  <div className="tool-trace-detail">
+                    {event.thought ? <p>{event.thought}</p> : null}
+                    {event.args && Object.keys(event.args).length ? (
                       <pre>{JSON.stringify(event.args, null, 2)}</pre>
-                    </details>
-                  ) : null}
-                  {event.result_preview ? <small>{event.result_preview}</small> : null}
-                  <ToolFileLink event={event} />
-                </article>
-              ))}
-            </div>
-          </details>
+                    ) : null}
+                    {event.result_preview ? <small>{event.result_preview}</small> : null}
+                    <ToolFileLink event={event} />
+                  </div>
+                </details>
+              )
+            })}
+          </div>
         ) : null}
 
         {!isUser && artifactLinks.length ? (
@@ -368,6 +373,16 @@ function formatArtifactHelper(format) {
   if (normalized === 'docx') return '文档文件已生成。'
   if (normalized === 'markdown' || normalized === 'md') return 'Markdown 文件已生成。'
   return '文件已生成。'
+}
+
+function formatToolName(tool) {
+  const map = {
+    doc_parse: '资料解析',
+    web_search: '联网搜索',
+    doc_export: '文件导出',
+    file_write: '文件写入',
+  }
+  return map[tool] || tool || '工具'
 }
 
 function formatToolStatus(status) {

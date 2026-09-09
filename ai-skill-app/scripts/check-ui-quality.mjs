@@ -163,6 +163,16 @@ const checks = [
     hint: 'Model reasoning from relay think tags / reasoning_content must surface in the thought panel, separated from session steps.',
   },
   {
+    name: 'Tool calls render as inline trace rows instead of a parked panel',
+    ok: files.messageBubble.includes('tool-trace-row') &&
+      files.messageBubble.includes('正在调用') &&
+      files.messageBubble.includes('tool-trace-spinner') &&
+      files.chatCss.includes('.chat-app .tool-trace') &&
+      !files.chatCss.includes('.chat-app .tool-panel') &&
+      !files.messageBubble.includes('tool-panel'),
+    hint: 'Tool execution should show live inline rows (spinner while running, one-line check summary after) instead of a static panel occupying space.',
+  },
+  {
     name: 'Run detail artifacts render as delivery cards',
     ok: [
       'artifact-file-card',
