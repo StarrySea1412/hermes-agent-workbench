@@ -375,6 +375,21 @@ export default function ChatView() {
     abortRef.current?.abort()
   }
 
+  const handleRegenerate = () => {
+    if (isSending) return
+    const items = [...messages]
+    while (items.length && items[items.length - 1].role === 'assistant') {
+      items.pop()
+    }
+    const lastUser = items[items.length - 1]
+    if (!lastUser || lastUser.role !== 'user') return
+    const content = lastUser.content
+    if (!content) return
+    // 从草稿里去掉最后这组问答，让 handleSend 原样重发
+    setChatDraft({ conversationId: String(convId), messages: items.slice(0, -1) })
+    handleSend(content)
+  }
+
   const handleFiles = async (files) => {
     const selectedFiles = Array.from(files || [])
     if (!selectedFiles.length) return
@@ -465,7 +480,11 @@ export default function ChatView() {
             {isLoading ? (
               <div className="loading-state">正在加载对话...</div>
             ) : (
-              <MessageList messages={messages} pendingMessageId={pendingId} onStarter={handleSend} />
+              <MessageList
+                messages={messages}
+                pendingMessageId={pendingId}
+                onRegenerate={handleRegenerate}
+              />
             )}
 
             {!isLoading && !messages.length ? (
@@ -485,6 +504,7 @@ export default function ChatView() {
               <ChatNotice
                 notice={notice}
                 copyState={copyState}
+                onClose={() => setChatNotice('')}
                 onCopy={async (text) => {
                   if (!text) return
                   const ok = await copyText(text)
@@ -524,17 +544,24 @@ export default function ChatView() {
   )
 }
 
-function ChatNotice({ notice, copyState, onCopy }) {
+function ChatNotice({ notice, copyState, onCopy, onClose }) {
   const normalized = normalizeNotice(notice)
   return (
     <div className={`chat-notice ${normalized.ok === false ? 'error' : ''} ${normalized.level === 'switch' ? 'switch' : ''}`}>
       <div className="chat-notice-main">
         <strong>{normalized.text}</strong>
-        {normalized.diagnosticText ? (
-          <button type="button" className="ghost-button" onClick={() => onCopy?.(normalized.diagnosticText)}>
-            {copyState || '复制诊断'}
-          </button>
-        ) : null}
+        <div className="chat-notice-side">
+          {normalized.diagnosticText ? (
+            <button type="button" className="ghost-button" onClick={() => onCopy?.(normalized.diagnosticText)}>
+              {copyState || '复制诊断'}
+            </button>
+          ) : null}
+          {onClose ? (
+            <button type="button" className="chat-notice-close" title="关闭" aria-label="关闭通知" onClick={onClose}>
+              <Icon name="x" size={12} />
+            </button>
+          ) : null}
+        </div>
       </div>
       {normalized.details?.length ? (
         <dl className="chat-diagnostic-list">

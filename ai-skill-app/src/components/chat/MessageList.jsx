@@ -44,7 +44,7 @@ export function EmptyChatHero({ onStarter, children }) {
   )
 }
 
-export default function MessageList({ messages = [], pendingMessageId }) {
+export default function MessageList({ messages = [], pendingMessageId, onRegenerate }) {
   const endRef = useRef(null)
   const listRef = useRef(null)
 
@@ -76,8 +76,14 @@ export default function MessageList({ messages = [], pendingMessageId }) {
   return (
     <div className={`message-list-wrap ${showTimeline ? 'with-timeline' : ''}`}>
       <div className="message-list" ref={listRef}>
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} pending={message.id === pendingMessageId} />
+        {messages.map((message, index) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            pending={message.id === pendingMessageId}
+            isLast={index === messages.length - 1}
+            onRegenerate={onRegenerate}
+          />
         ))}
         <div ref={endRef} />
       </div>
@@ -114,6 +120,25 @@ export default function MessageList({ messages = [], pendingMessageId }) {
               ))}
             </ul>
           ) : null}
+        </nav>
+      ) : null}
+
+      {nodes.length >= 2 ? (
+        <nav className="chat-timeline-mobile" aria-label="对话节点">
+          {nodes.map((node) => (
+            <button
+              key={`m-${node.messageId}-${node.preview}`}
+              type="button"
+              className={`chat-timeline-item ${node.kind}`}
+              title={node.preview}
+              onClick={() => jumpTo(node.messageId)}
+            >
+              <span className="chat-timeline-icon" aria-hidden="true">
+                <Icon name={node.icon} size={11} />
+              </span>
+              <span className="chat-timeline-text">{node.preview}</span>
+            </button>
+          ))}
         </nav>
       ) : null}
     </div>

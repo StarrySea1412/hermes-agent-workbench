@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../Icon'
 import { resolveFileUrl } from '../../api/files'
 
-export default function MessageBubble({ message, pending }) {
+export default function MessageBubble({ message, pending, isLast = false, onRegenerate }) {
   const isUser = message.role === 'user'
   const toolEvents = Array.isArray(message.metadata?.tool_events) ? message.metadata.tool_events : []
   const thoughts = Array.isArray(message.metadata?.thoughts) ? message.metadata.thoughts : []
@@ -149,6 +149,12 @@ export default function MessageBubble({ message, pending }) {
               <Icon name="copy" size={12} />
               {copyState || '复制'}
             </button>
+            {isLast && onRegenerate ? (
+              <button type="button" className="message-action-btn" onClick={onRegenerate}>
+                <Icon name="refresh" size={12} />
+                重新生成
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

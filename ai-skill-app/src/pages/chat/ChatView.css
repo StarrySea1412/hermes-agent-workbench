@@ -551,6 +551,50 @@
   white-space: nowrap;
 }
 
+/* 移动端横向节点条（≥1181px 隐藏，桌面用右侧时间线） */
+.chat-app .chat-timeline-mobile {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .chat-app .message-list-wrap {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .chat-app .chat-timeline-mobile {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    min-width: 0;
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
+    background: var(--sidebar);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .chat-app .chat-timeline-mobile::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chat-app .chat-timeline-mobile .chat-timeline-item {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 180px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .chat-app .chat-timeline-mobile .chat-timeline-item:hover {
+    border-color: var(--line-strong);
+  }
+
+  .chat-app .chat-timeline-mobile .chat-timeline-text {
+    flex: 0 1 auto;
+    max-width: 150px;
+  }
+}
+
 .chat-app .message-row {
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
@@ -1043,19 +1087,38 @@
 }
 
 .chat-app .chat-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 108px;
+  z-index: 45;
   display: grid;
   gap: 8px;
-  min-width: 0;
+  width: min(560px, calc(100vw - 32px));
   margin: 0;
-  padding: 10px clamp(16px, 3vw, 36px);
-  border-top: 1px solid var(--line);
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
   color: var(--muted-strong);
-  background: var(--surface-soft);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
   font-size: 12.5px;
+  transform: translateX(-50%);
+  animation: notice-in 0.22s ease;
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .chat-app .chat-notice.switch {
-  border-top-color: var(--line);
+  border-color: rgba(149, 95, 13, 0.35);
   color: var(--warning);
   background: var(--warning-soft);
 }
@@ -1071,9 +1134,26 @@
 }
 
 .chat-app .chat-notice.error {
-  border-top-color: rgba(199, 53, 53, 0.25);
+  border-color: rgba(199, 53, 53, 0.3);
   color: var(--danger);
   background: var(--danger-soft);
+}
+
+.chat-app .chat-notice-close {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.chat-app .chat-notice-close:hover {
+  color: var(--ink);
+  background: var(--hover);
 }
 
 .chat-app .chat-notice-main {

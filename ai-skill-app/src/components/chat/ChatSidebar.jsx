@@ -1,7 +1,35 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import Icon from '../Icon'
 import { useHermesMonitor } from '../../hooks/useAIConfig'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function groupConversations(conversations, query) {
+  const q = query.trim().toLowerCase()
+  const matched = q
+    ? conversations.filter((item) => {
+        const haystack = `${item.title || ''} ${item.last_message?.content || ''}`.toLowerCase()
+        return haystack.includes(q)
+      })
+    : conversations
+
+  const groups = [
+    { key: 'today', label: '今天', items: [] },
+    { key: 'week', label: '最近 7 天', items: [] },
+    { key: 'older', label: '更早', items: [] },
+  ]
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+
+  for (const item of matched) {
+    const ts = Date.parse(item.updated_at || item.created_at || '') || 0
+    if (ts >= startOfToday.getTime()) groups[0].items.push(item)
+    else if (ts >= startOfToday.getTime() - 7 * DAY_MS) groups[1].items.push(item)
+    else groups[2].items.push(item)
+  }
+  return groups.filter((group) => group.items.length)
+}
 
 export default function ChatSidebar({
   conversations = [],
@@ -19,6 +47,7 @@ export default function ChatSidebar({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [renamingId, setRenamingId] = useState(null)
   const [renameValue, setRenameValue] = useState('')
+  const [query, setQuery] = useState('')
   const { data: hermesMonitor } = useHermesMonitor()
   const hermesOnline = Boolean(
     hermesMonitor?.connected || (hermesMonitor?.tcp_connected && hermesMonitor?.models_connected)
@@ -40,6 +69,74 @@ export default function ChatSidebar({
     setRenamingId(null)
     setRenameValue('')
   }
+
+  const groups = useMemo(
+    () => groupConversations(conversations, query),
+    [conversations, query]
+  )
+
+  const renderConversation = (item) => (
+    <div
+      key={item.id}
+      className={`conversation-item-shell ${String(activeId) === String(item.id) ? 'active' : ''}`}
+    >
+      {renamingId != null && String(renamingId) === String(item.id) ? (
+        <form
+          className="conversation-rename"
+          onSubmit={(event) => {
+            event.preventDefault()
+            commitRename()
+          }}
+        >
+          <input
+            autoFocus
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setRenamingId(null)
+            }}
+            onBlur={commitRename}
+            aria-label="会话名称"
+          />
+        </form>
+      ) : (
+        <Link
+          className="conversation-item"
+          to={`/chat/${item.id}`}
+          onClick={() => setHistoryOpen(false)}
+        >
+          <span>{item.title}</span>
+          <small>{item.last_message?.content || '等待第一条消息'}</small>
+        </Link>
+      )}
+      <div className="conversation-item-actions">
+        {onRenameChat && renamingId == null ? (
+          <button
+            type="button"
+            className="conversation-action-btn"
+            disabled={String(deletingId || '') === String(item.id)}
+            title="重命名"
+            aria-label={`重命名 ${item.title}`}
+            onClick={() => startRename(item)}
+          >
+            <Icon name="rename" size={13} />
+          </button>
+        ) : null}
+        {onDeleteChat ? (
+          <button
+            type="button"
+            className="conversation-action-btn danger"
+            disabled={String(deletingId || '') === String(item.id)}
+            title="删除会话"
+            aria-label={`删除 ${item.title}`}
+            onClick={() => onDeleteChat(item.id)}
+          >
+            <Icon name="trash" size={13} />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
 
   return (
     <aside className={`chat-sidebar ${historyOpen ? 'history-open' : ''}`}>
@@ -91,77 +188,43 @@ export default function ChatSidebar({
         </NavLink>
       </nav>
 
+      <div className="history-search">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索会话…"
+          aria-label="搜索会话"
+        />
+        {query ? (
+          <button
+            type="button"
+            className="history-search-clear"
+            title="清空搜索"
+            onClick={() => setQuery('')}
+          >
+            <Icon name="x" size={12} />
+          </button>
+        ) : null}
+      </div>
+
       <div className="history-title">
-        历史会话
-        {conversations.length ? <span className="history-count">{conversations.length}</span> : null}
+        {query ? `搜索结果 · ${groups.reduce((sum, g) => sum + g.items.length, 0)}` : '历史会话'}
+        {!query && conversations.length ? <span className="history-count">{conversations.length}</span> : null}
       </div>
 
       <div className="conversation-list">
-        {conversations.map((item) => (
-          <div
-            key={item.id}
-            className={`conversation-item-shell ${String(activeId) === String(item.id) ? 'active' : ''}`}
-          >
-            {renamingId != null && String(renamingId) === String(item.id) ? (
-              <form
-                className="conversation-rename"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  commitRename()
-                }}
-              >
-                <input
-                  autoFocus
-                  value={renameValue}
-                  onChange={(event) => setRenameValue(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') setRenamingId(null)
-                  }}
-                  onBlur={commitRename}
-                  aria-label="会话名称"
-                />
-              </form>
-            ) : (
-              <Link
-                className="conversation-item"
-                to={`/chat/${item.id}`}
-                onClick={() => setHistoryOpen(false)}
-              >
-                <span>{item.title}</span>
-                <small>{item.last_message?.content || '等待第一条消息'}</small>
-              </Link>
-            )}
-            <div className="conversation-item-actions">
-              {onRenameChat && renamingId == null ? (
-                <button
-                  type="button"
-                  className="conversation-action-btn"
-                  disabled={String(deletingId || '') === String(item.id)}
-                  title="重命名"
-                  aria-label={`重命名 ${item.title}`}
-                  onClick={() => startRename(item)}
-                >
-                  <Icon name="rename" size={13} />
-                </button>
-              ) : null}
-              {onDeleteChat ? (
-                <button
-                  type="button"
-                  className="conversation-action-btn danger"
-                  disabled={String(deletingId || '') === String(item.id)}
-                  title="删除会话"
-                  aria-label={`删除 ${item.title}`}
-                  onClick={() => onDeleteChat(item.id)}
-                >
-                  <Icon name="trash" size={13} />
-                </button>
-              ) : null}
-            </div>
+        {groups.map((group) => (
+          <div key={group.key} className="conversation-group">
+            {groups.length > 1 ? <div className="conversation-group-title">{group.label}</div> : null}
+            {group.items.map(renderConversation)}
           </div>
         ))}
 
-        {!conversations.length ? (
-          <div className="conversation-empty">直接输入任务，Hermes 会创建会话。</div>
+        {!groups.length ? (
+          <div className="conversation-empty">
+            {query ? `没有匹配「${query}」的会话。` : '直接输入任务，Hermes 会创建会话。'}
+          </div>
         ) : null}
       </div>
 

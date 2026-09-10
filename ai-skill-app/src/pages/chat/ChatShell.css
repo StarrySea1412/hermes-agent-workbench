@@ -25,6 +25,7 @@
 .chat-app .chat-sidebar > .sidebar-mobile-row,
 .chat-app .chat-sidebar > .new-chat-btn,
 .chat-app .chat-sidebar > .sidebar-nav,
+.chat-app .chat-sidebar > .history-search,
 .chat-app .chat-sidebar > .history-title,
 .chat-app .chat-sidebar > .sidebar-footer {
   flex: 0 0 auto;
@@ -178,6 +179,66 @@
 .chat-app .sidebar-nav-link.active .icon,
 .chat-app .sidebar-nav-link:hover .icon {
   color: var(--ink);
+}
+
+.chat-app .history-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.chat-app .history-search input {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-app .history-search input::placeholder {
+  color: var(--muted);
+}
+
+.chat-app .history-search input:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(20, 20, 19, 0.06);
+}
+
+.chat-app .history-search-clear {
+  position: absolute;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.chat-app .history-search-clear:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.chat-app .conversation-group {
+  display: grid;
+  gap: 1px;
+}
+
+.chat-app .conversation-group-title {
+  padding: 8px 10px 3px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .chat-app .history-title {
