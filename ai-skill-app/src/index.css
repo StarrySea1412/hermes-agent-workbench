@@ -125,6 +125,11 @@ select:focus-visible {
   padding-bottom: 6px;
 }
 
+.workbench-sidebar .sidebar-nav .sidebar-more {
+  display: grid;
+  gap: 2px;
+}
+
 .workbench-sidebar .sidebar-nav .sidebar-more summary {
   margin: 2px 0;
   padding: 6px 12px;
@@ -153,6 +158,8 @@ select:focus-visible {
 }
 
 .workbench-sidebar .sidebar-nav .sidebar-more .sidebar-link {
+  /* details 的展开内容在部分 Chromium 上不会 grid-item 化，显式块级化保证纵向排列 */
+  display: block;
   padding-left: 22px;
 }
 
