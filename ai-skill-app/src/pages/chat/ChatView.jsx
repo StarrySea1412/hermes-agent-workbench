@@ -9,6 +9,7 @@ import {
   listConversations,
   renameConversation,
   streamMessage,
+  updateConversation,
   uploadProjectFiles,
 } from '../../api/projects'
 import ChatInput from '../../components/chat/ChatInput'
@@ -102,6 +103,44 @@ export default function ChatView() {
     const trimmed = String(title || '').trim()
     if (!trimmed || renameMutation.isPending) return
     renameMutation.mutate({ conversationId, title: trimmed })
+  }
+
+  const pinMutation = useMutation({
+    mutationFn: ({ conversationId, isPinned }) =>
+      updateConversation(conversationId, { is_pinned: isPinned }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    }
+  })
+
+  const handlePinChat = (conversationId, isPinned) => {
+    pinMutation.mutate({ conversationId, isPinned })
+  }
+
+  const handleExportMarkdown = () => {
+    if (!messages.length) return
+    const lines = [`# ${conversation?.title || '会话'}`, '', `> 导出时间：${new Date().toLocaleString()}`, '']
+    for (const message of messages) {
+      const role = message.role === 'user' ? '🙋 我' : '🤖 Hermes'
+      lines.push(`## ${role}`, '', String(message.content || '').trim() || '（无内容）', '')
+      const events = Array.isArray(message.metadata?.tool_events) ? message.metadata.tool_events : []
+      if (events.length) {
+        lines.push('**工具轨迹**', '')
+        for (const event of events) {
+          lines.push(`- ${event.name || '工具'}：${event.result_preview || event.status || ''}`)
+        }
+        lines.push('')
+      }
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${(conversation?.title || '会话').slice(0, 40).replace(/[\\/:*?"<>|]/g, '')}.md`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
   }
 
   const createWorkspace = () => {
@@ -432,6 +471,7 @@ export default function ChatView() {
         onDeleteChat={handleDeleteConversation}
         deletingId={deleteMutation.variables}
         onRenameChat={handleRenameConversation}
+        onPinChat={handlePinChat}
         user={user}
         onLogout={logout}
         isLocalMode={isLocalMode}
@@ -443,6 +483,17 @@ export default function ChatView() {
             <h1>{conversation?.title || '新任务'}</h1>
           </div>
           <div className="chat-header-actions">
+            {convId && messages.length ? (
+              <button
+                type="button"
+                className="ghost-button"
+                title="导出会话为 Markdown"
+                aria-label="导出会话"
+                onClick={handleExportMarkdown}
+              >
+                <Icon name="download" size={14} />
+              </button>
+            ) : null}
             <button
               type="button"
               className="ghost-button"
@@ -505,6 +556,7 @@ export default function ChatView() {
                 notice={notice}
                 copyState={copyState}
                 onClose={() => setChatNotice('')}
+                onRetry={normalizedNoticeOk(notice) ? undefined : handleRegenerate}
                 onCopy={async (text) => {
                   if (!text) return
                   const ok = await copyText(text)
@@ -544,13 +596,23 @@ export default function ChatView() {
   )
 }
 
-function ChatNotice({ notice, copyState, onCopy, onClose }) {
+function normalizedNoticeOk(notice) {
+  if (typeof notice === 'string') return true
+  return (notice || { ok: true }).ok !== false
+}
+
+function ChatNotice({ notice, copyState, onCopy, onClose, onRetry }) {
   const normalized = normalizeNotice(notice)
   return (
     <div className={`chat-notice ${normalized.ok === false ? 'error' : ''} ${normalized.level === 'switch' ? 'switch' : ''}`}>
       <div className="chat-notice-main">
         <strong>{normalized.text}</strong>
         <div className="chat-notice-side">
+          {normalized.ok === false && onRetry ? (
+            <button type="button" className="ghost-button" onClick={onRetry}>
+              重试
+            </button>
+          ) : null}
           {normalized.diagnosticText ? (
             <button type="button" className="ghost-button" onClick={() => onCopy?.(normalized.diagnosticText)}>
               {copyState || '复制诊断'}

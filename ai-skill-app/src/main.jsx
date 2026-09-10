@@ -5,6 +5,9 @@ import './index.css'
 import App from './App.jsx'
 import QueryProvider from './providers/QueryProvider.jsx'
 import { ToastProvider } from './components/Toast/index.jsx'
+import { applyTheme, getTheme } from './theme.js'
+
+applyTheme(getTheme())
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

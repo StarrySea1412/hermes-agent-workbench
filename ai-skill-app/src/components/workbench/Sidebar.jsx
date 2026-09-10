@@ -1,10 +1,14 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import Icon from '../Icon'
+import { getTheme, toggleTheme } from '../../theme'
 import RunStatusBadge from './RunStatusBadge'
 import { useHermesMonitor } from '../../hooks/useAIConfig'
 
 export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false }) {
   const navigate = useNavigate()
+  const [theme, setThemeState] = useState(getTheme())
+  const handleToggleTheme = () => setThemeState(toggleTheme())
   const { data: hermesMonitor } = useHermesMonitor()
   const recentRuns = runs.slice(0, 6)
   const hermesOnline = Boolean(hermesMonitor?.connected)
@@ -93,6 +97,15 @@ export default function Sidebar({ runs = [], user, onLogout, isLocalMode = false
           <strong>{user?.display_name || user?.username || '访客'}</strong>
           <span>{isLocalMode ? '本地模式' : user ? '已登录' : '访客模式'}</span>
         </div>
+        <button
+          type="button"
+          className="theme-toggle-btn"
+          title={theme === 'dark' ? '切换浅色' : '切换深色'}
+          aria-label="切换深浅色"
+          onClick={handleToggleTheme}
+        >
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={14} />
+        </button>
         {onLogout ? (
           <button
             type="button"

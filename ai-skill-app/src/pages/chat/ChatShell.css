@@ -70,7 +70,7 @@
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  color: #ffffff;
+  color: var(--primary-fg);
   background: var(--ink);
 }
 
@@ -131,7 +131,7 @@
   width: 100%;
   border: 1px solid var(--primary);
   border-radius: var(--radius);
-  color: #ffffff;
+  color: var(--primary-fg);
   background: var(--primary);
   font-size: 13px;
   font-weight: 600;
@@ -352,6 +352,11 @@
 .chat-app .conversation-action-btn:hover {
   color: var(--ink);
   background: var(--active);
+}
+
+.chat-app .conversation-action-btn.pinned {
+  color: var(--warning);
+  opacity: 1;
 }
 
 .chat-app .conversation-action-btn.danger:hover {

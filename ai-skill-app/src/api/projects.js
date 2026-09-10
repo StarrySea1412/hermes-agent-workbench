@@ -68,6 +68,10 @@ export function renameConversation(conversationId, title) {
   return client.patch(`/conversations/${conversationId}/`, { title })
 }
 
+export function updateConversation(conversationId, data) {
+  return client.patch(`/conversations/${conversationId}/`, data)
+}
+
 export async function streamMessage(conversationId, data, handlers = {}, options = {}) {
   const response = await fetch(`${API_BASE}/conversations/${conversationId}/stream/`, {
     method: 'POST',

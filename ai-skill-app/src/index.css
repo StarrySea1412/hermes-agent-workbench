@@ -1,6 +1,7 @@
 ﻿:root {
   /* Codex 风格设计令牌：近单色、细边框、黑色主按钮 */
   --bg: #ffffff;
+  --primary-fg: #ffffff;
   --bg-soft: #f7f7f6;
   --sidebar: #f9f9f8;
   --sidebar-muted: #8f8e8c;
@@ -39,6 +40,41 @@
   font-size: 14px;
   color: var(--ink);
   background: var(--bg);
+}
+
+/* 深色主题：覆盖令牌即可，组件层全部走 var() */
+:root[data-theme='dark'] {
+  --bg: #1f1f1e;
+  --primary-fg: #1f1f1e;
+  --bg-soft: #262625;
+  --sidebar: #232322;
+  --surface: #2a2a28;
+  --surface-soft: #30302e;
+  --surface-strong: #3a3a38;
+  --hover: #333331;
+  --active: #3d3d3b;
+  --ink: #ececea;
+  --muted: #98978f;
+  --muted-strong: #c3c2bd;
+  --line: #383836;
+  --line-strong: #484845;
+  --primary: #f0f0ee;
+  --primary-hover: #d9d9d5;
+  --primary-soft: #333331;
+  --link: #82a9ee;
+  --agent: #ececea;
+  --agent-soft: #30302e;
+  --success: #57c17c;
+  --success-soft: #243527;
+  --warning: #d0a04a;
+  --warning-soft: #37301e;
+  --danger: #e07070;
+  --danger-soft: #3d2626;
+  --info: #7ba3e0;
+  --info-soft: #25303f;
+  --thinking: #a99ee0;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -214,7 +250,7 @@ select:focus-visible {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  color: #ffffff;
+  color: var(--primary-fg);
   background: var(--ink);
 }
 
@@ -341,6 +377,23 @@ select:focus-visible {
 .sidebar-account > div {
   flex: 1;
   min-width: 0;
+}
+
+.theme-toggle-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--muted-strong);
+  background: var(--surface);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--hover);
+  color: var(--ink);
 }
 
 /* ---------------- 页面结构 ---------------- */
@@ -635,7 +688,7 @@ select:focus-visible {
 
 .primary-button {
   border: 1px solid var(--primary);
-  color: #ffffff;
+  color: var(--primary-fg);
   background: var(--primary);
 }
 
@@ -1090,7 +1143,7 @@ select:focus-visible {
 }
 
 .danger-button:hover {
-  color: #ffffff;
+  color: var(--primary-fg);
   background: var(--danger);
   border-color: var(--danger);
 }

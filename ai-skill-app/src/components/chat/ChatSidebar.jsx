@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import Icon from '../Icon'
+import { getTheme, toggleTheme } from '../../theme'
 import { useHermesMonitor } from '../../hooks/useAIConfig'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -14,6 +15,8 @@ function groupConversations(conversations, query) {
       })
     : conversations
 
+  const pinned = matched.filter((item) => item.is_pinned)
+  const rest = matched.filter((item) => !item.is_pinned)
   const groups = [
     { key: 'today', label: '今天', items: [] },
     { key: 'week', label: '最近 7 天', items: [] },
@@ -22,13 +25,17 @@ function groupConversations(conversations, query) {
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
 
-  for (const item of matched) {
+  for (const item of rest) {
     const ts = Date.parse(item.updated_at || item.created_at || '') || 0
     if (ts >= startOfToday.getTime()) groups[0].items.push(item)
     else if (ts >= startOfToday.getTime() - 7 * DAY_MS) groups[1].items.push(item)
     else groups[2].items.push(item)
   }
-  return groups.filter((group) => group.items.length)
+  const timed = groups.filter((group) => group.items.length)
+  if (pinned.length) {
+    timed.unshift({ key: 'pinned', label: '置顶', items: pinned })
+  }
+  return timed
 }
 
 export default function ChatSidebar({
@@ -37,6 +44,7 @@ export default function ChatSidebar({
   onNewChat,
   onDeleteChat,
   onRenameChat,
+  onPinChat,
   deletingId,
   user,
   onLogout,
@@ -48,6 +56,11 @@ export default function ChatSidebar({
   const [renamingId, setRenamingId] = useState(null)
   const [renameValue, setRenameValue] = useState('')
   const [query, setQuery] = useState('')
+  const [theme, setThemeState] = useState(getTheme())
+
+  const handleToggleTheme = () => {
+    setThemeState(toggleTheme())
+  }
   const { data: hermesMonitor } = useHermesMonitor()
   const hermesOnline = Boolean(
     hermesMonitor?.connected || (hermesMonitor?.tcp_connected && hermesMonitor?.models_connected)
@@ -110,6 +123,18 @@ export default function ChatSidebar({
         </Link>
       )}
       <div className="conversation-item-actions">
+        {onPinChat && renamingId == null ? (
+          <button
+            type="button"
+            className={`conversation-action-btn ${item.is_pinned ? 'pinned' : ''}`}
+            disabled={String(deletingId || '') === String(item.id)}
+            title={item.is_pinned ? '取消置顶' : '置顶'}
+            aria-label={item.is_pinned ? `取消置顶 ${item.title}` : `置顶 ${item.title}`}
+            onClick={() => onPinChat(item.id, !item.is_pinned)}
+          >
+            <Icon name="star" size={13} />
+          </button>
+        ) : null}
         {onRenameChat && renamingId == null ? (
           <button
             type="button"
@@ -249,6 +274,15 @@ export default function ChatSidebar({
             <strong>{user?.display_name || user?.username || '访客'}</strong>
             <small>{isLocalMode ? '本地模式' : user ? '已登录' : '访客模式'}</small>
           </span>
+          <button
+            type="button"
+            className="sidebar-logout-btn"
+            title={theme === 'dark' ? '切换浅色' : '切换深色'}
+            aria-label="切换深浅色"
+            onClick={handleToggleTheme}
+          >
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={14} />
+          </button>
           {onLogout ? (
             <button
               type="button"
