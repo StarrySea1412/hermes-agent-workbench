@@ -58,14 +58,43 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
   const [collapsed, setCollapsed] = useState(false)
   const showTimeline = enoughNodes && !collapsed
 
-  const jumpTo = (messageId) => {
-    const target = document.getElementById(`msg-${messageId}`)
+  // 滚动联动：视口上方 1/3 处所在的节点视为当前位置（Codex 式 active 追踪）
+  const [activeAnchor, setActiveAnchor] = useState(null)
+  useEffect(() => {
+    const root = listRef.current
+    if (!root || !showTimeline) return undefined
+    let raf = 0
+    const update = () => {
+      raf = 0
+      const limit = root.getBoundingClientRect().top + root.clientHeight * 0.35
+      let current = null
+      for (const node of nodes) {
+        const el = document.getElementById(node.anchorId)
+        if (el && el.getBoundingClientRect().top <= limit) current = node.anchorId
+      }
+      setActiveAnchor(current ?? nodes[0]?.anchorId ?? null)
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update)
+    }
+    root.addEventListener('scroll', onScroll, { passive: true })
+    update()
+    return () => {
+      root.removeEventListener('scroll', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [nodes, showTimeline])
+
+  const jumpTo = (node) => {
+    const target = document.getElementById(node.anchorId) || document.getElementById(`msg-${node.messageId}`)
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      target.classList.remove('flash')
+      const row = target.closest('.message-row') || target
+      row.classList.remove('flash')
       // 重新触发高亮动画
-      void target.offsetWidth
-      target.classList.add('flash')
+      void row.offsetWidth
+      row.classList.add('flash')
+      setActiveAnchor(node.anchorId)
     }
   }
 
@@ -104,15 +133,16 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
           {!collapsed ? (
             <ul className="chat-timeline-list">
               {nodes.map((node) => (
-                <li key={node.messageId + node.preview}>
+                <li key={node.anchorId}>
                   <button
                     type="button"
-                    className={`chat-timeline-item ${node.kind}`}
+                    className={`chat-timeline-item ${node.kind} ${node.failed ? 'failed' : ''} ${activeAnchor === node.anchorId ? 'active' : ''}`}
                     title={node.preview}
-                    onClick={() => jumpTo(node.messageId)}
+                    aria-current={activeAnchor === node.anchorId ? 'true' : undefined}
+                    onClick={() => jumpTo(node)}
                   >
                     <span className="chat-timeline-icon" aria-hidden="true">
-                      <Icon name={node.icon} size={11} />
+                      <Icon name={node.icon} size={10} />
                     </span>
                     <span className="chat-timeline-text">{node.preview}</span>
                   </button>
@@ -127,14 +157,14 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
         <nav className="chat-timeline-mobile" aria-label="对话节点">
           {nodes.map((node) => (
             <button
-              key={`m-${node.messageId}-${node.preview}`}
+              key={`m-${node.anchorId}`}
               type="button"
-              className={`chat-timeline-item ${node.kind}`}
+              className={`chat-timeline-item ${node.kind} ${node.failed ? 'failed' : ''} ${activeAnchor === node.anchorId ? 'active' : ''}`}
               title={node.preview}
-              onClick={() => jumpTo(node.messageId)}
+              onClick={() => jumpTo(node)}
             >
               <span className="chat-timeline-icon" aria-hidden="true">
-                <Icon name={node.icon} size={11} />
+                <Icon name={node.icon} size={10} />
               </span>
               <span className="chat-timeline-text">{node.preview}</span>
             </button>
@@ -151,6 +181,7 @@ function buildTimelineNodes(messages) {
     if (message.role === 'user') {
       nodes.push({
         messageId: message.id,
+        anchorId: `msg-${message.id}`,
         kind: 'user',
         icon: 'user',
         preview: truncate(String(message.content || '用户消息'), NODE_PREVIEW_MAX),
@@ -158,18 +189,21 @@ function buildTimelineNodes(messages) {
       continue
     }
     const toolEvents = Array.isArray(message.metadata?.tool_events) ? message.metadata.tool_events : []
-    for (const event of toolEvents) {
+    toolEvents.forEach((event, toolIndex) => {
       nodes.push({
         messageId: message.id,
+        anchorId: `msg-${message.id}-tool-${toolIndex}`,
         kind: 'tool',
+        failed: event.status === 'error',
         icon: event.status === 'error' ? 'x' : 'check',
         preview: truncate(`${formatToolName(event.name)}：${event.result_preview || (event.status === 'error' ? '失败' : '完成')}`, NODE_PREVIEW_MAX),
       })
-    }
+    })
     const answer = String(message.content || '').trim()
     if (answer) {
       nodes.push({
         messageId: message.id,
+        anchorId: `msg-${message.id}-answer`,
         kind: 'answer',
         icon: 'chat',
         preview: truncate(answer.replace(/[#*`>\-\n]+/g, ' ').trim(), NODE_PREVIEW_MAX),

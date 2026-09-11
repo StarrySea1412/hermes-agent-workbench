@@ -486,15 +486,26 @@
 }
 
 .chat-app .chat-timeline-list {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
   margin: 0;
-  padding: 0 8px 12px;
+  padding: 2px 8px 12px;
   list-style: none;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
+}
+
+/* 垂直轨道线：贯穿所有节点标记（Codex 式 thread rail） */
+.chat-app .chat-timeline-list::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 12px;
+  bottom: 14px;
+  width: 1px;
+  background: color-mix(in srgb, var(--muted-strong) 80%, transparent);
 }
 
 .chat-app .chat-timeline-list li {
@@ -502,16 +513,18 @@
 }
 
 .chat-app .chat-timeline-item {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: 5px 7px;
+  padding: 4px 6px 4px 0;
   border: 0;
   border-radius: var(--radius);
-  color: var(--muted-strong);
+  color: var(--muted);
   background: transparent;
   font-size: 11.5px;
   text-align: left;
@@ -522,29 +535,54 @@
   color: var(--ink);
 }
 
+/* 节点标记：骑在轨道线上的圆形徽标 */
 .chat-app .chat-timeline-icon {
+  grid-column: 1;
+  position: relative;
+  z-index: 1;
   display: grid;
-  flex: 0 0 auto;
   place-items: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
   color: var(--muted);
-  background: var(--surface-strong);
+  background: var(--bg);
 }
 
 .chat-app .chat-timeline-item.user .chat-timeline-icon {
-  color: var(--muted-strong);
+  border-color: transparent;
+  color: var(--primary-fg);
+  background: var(--brand-grad);
 }
 
 .chat-app .chat-timeline-item.tool .chat-timeline-icon {
+  border-color: transparent;
   color: var(--success);
-  background: var(--success-soft);
+  background: color-mix(in srgb, var(--success) 16%, var(--bg));
+}
+
+.chat-app .chat-timeline-item.tool.failed .chat-timeline-icon {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, var(--bg));
 }
 
 .chat-app .chat-timeline-item.answer .chat-timeline-icon {
   color: var(--primary);
-  background: var(--primary-soft);
+  background: var(--bg);
+  border-color: var(--primary);
+}
+
+.chat-app .chat-timeline-item.active {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.chat-app .chat-timeline-item.active .chat-timeline-icon {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 
 .chat-app .chat-timeline-text {
@@ -553,6 +591,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 节点跳转落点余量 */
+.chat-app .message-row,
+.chat-app .tool-trace-row,
+.chat-app .message-content {
+  scroll-margin-top: 10px;
 }
 
 /* 移动端横向节点条（≥1181px 隐藏，桌面用右侧时间线） */

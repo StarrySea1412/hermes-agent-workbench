@@ -82,10 +82,14 @@ export default function MessageBubble({ message, pending, isLast = false, onRege
 
         {!isUser && toolEvents.length > 0 ? (
           <div className={`tool-trace ${pending ? 'running' : ''}`}>
-            {toolEvents.map((event) => {
+            {toolEvents.map((event, toolIndex) => {
               const running = pending && event.status === 'running'
               return (
-                <details key={event.id || `${event.name}-${JSON.stringify(event.args || {})}`} className="tool-trace-row">
+                <details
+                  key={event.id || `${event.name}-${JSON.stringify(event.args || {})}`}
+                  className="tool-trace-row"
+                  id={`msg-${message.id}-tool-${toolIndex}`}
+                >
                   <summary>
                     {running ? (
                       <span className="tool-trace-spinner" aria-hidden="true" />
@@ -136,7 +140,7 @@ export default function MessageBubble({ message, pending, isLast = false, onRege
           </section>
         ) : null}
 
-        <div className="message-content">
+        <div className="message-content" id={isUser ? undefined : `msg-${message.id}-answer`}>
           {answer
             ? renderMarkdownLite(answer)
             : <span className="typing-dot">{pending ? '正在生成...' : '没有收到可显示的回复，请重试或检查模型连接。'}</span>}
