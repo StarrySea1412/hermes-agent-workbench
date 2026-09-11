@@ -5,8 +5,8 @@
   --bg-soft: rgba(255, 255, 255, 0.55);
   --sidebar: #f9f9f8;
   --sidebar-muted: #8f8e8c;
-  --surface: rgba(255, 255, 255, 0.62);
-  --surface-soft: rgba(255, 255, 255, 0.45);
+  --surface: rgba(255, 255, 255, 0.5);
+  --surface-soft: rgba(255, 255, 255, 0.38);
   --surface-strong: rgba(255, 255, 255, 0.85);
   --hover: rgba(20, 20, 19, 0.045);
   --active: rgba(20, 20, 19, 0.07);
@@ -26,7 +26,7 @@
   --focus-outline: rgba(91, 91, 214, 0.45);
   --user-bubble: rgba(91, 91, 214, 0.08);
   --user-bubble-border: rgba(91, 91, 214, 0.28);
-  --hero-glow: rgba(91, 91, 214, 0.08);
+  --hero-glow: rgba(91, 91, 214, 0.12);
   --code-bg: #1e1e1c;
   --code-fg: #e8e8e6;
   --thinking: #6f62c2;
@@ -41,16 +41,16 @@
   --info: #3b6ec1;
   --info-soft: rgba(59, 110, 193, 0.1);
   /* 玻璃面板：背景、描边、顶部高光、模糊滤镜 */
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-bg-strong: rgba(255, 255, 255, 0.75);
+  --glass-bg: rgba(255, 255, 255, 0.42);
+  --glass-bg-strong: rgba(255, 255, 255, 0.62);
   --glass-edge: rgba(255, 255, 255, 0.7);
   --glass-sheen: rgba(255, 255, 255, 0.9);
-  --glass-blur: blur(20px) saturate(1.6);
+  --glass-blur: blur(28px) saturate(1.8);
   --glass-shadow: 0 8px 28px rgba(20, 20, 19, 0.08);
   /* 极光色晕：低饱和紫/蓝/青 */
-  --aurora-1: rgba(122, 110, 230, 0.16);
-  --aurora-2: rgba(76, 106, 220, 0.12);
-  --aurora-3: rgba(64, 174, 206, 0.1);
+  --aurora-1: rgba(122, 110, 230, 0.3);
+  --aurora-2: rgba(76, 106, 220, 0.22);
+  --aurora-3: rgba(64, 174, 206, 0.18);
   --shadow: 0 1px 2px rgba(20, 20, 19, 0.05);
   --shadow-pop: 0 12px 32px rgba(20, 20, 19, 0.14);
   --radius: 8px;
@@ -72,7 +72,7 @@
   --bg-soft: rgba(23, 23, 26, 0.6);
   --sidebar: #1e1e1d;
   --sidebar-muted: #8f8e8c;
-  --surface: rgba(38, 38, 42, 0.6);
+  --surface: rgba(38, 38, 42, 0.5);
   --surface-soft: rgba(255, 255, 255, 0.05);
   --surface-strong: rgba(255, 255, 255, 0.1);
   --hover: rgba(255, 255, 255, 0.06);
@@ -107,15 +107,15 @@
   --danger-soft: rgba(224, 112, 112, 0.14);
   --info: #7ba3e0;
   --info-soft: rgba(123, 163, 224, 0.14);
-  --glass-bg: rgba(34, 34, 38, 0.5);
-  --glass-bg-strong: rgba(38, 38, 42, 0.7);
+  --glass-bg: rgba(34, 34, 38, 0.4);
+  --glass-bg-strong: rgba(38, 38, 42, 0.58);
   --glass-edge: rgba(255, 255, 255, 0.1);
   --glass-sheen: rgba(255, 255, 255, 0.09);
-  --glass-blur: blur(22px) saturate(1.5);
+  --glass-blur: blur(28px) saturate(1.7);
   --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  --aurora-1: rgba(109, 111, 232, 0.2);
-  --aurora-2: rgba(76, 106, 220, 0.15);
-  --aurora-3: rgba(64, 174, 206, 0.08);
+  --aurora-1: rgba(109, 111, 232, 0.32);
+  --aurora-2: rgba(76, 106, 220, 0.24);
+  --aurora-3: rgba(64, 174, 206, 0.15);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
@@ -134,15 +134,33 @@ body,
 
 body {
   margin: 0;
-  /* 极光基底：固定不随滚动，玻璃面板的 backdrop-blur 打在这层色晕上 */
-  background:
-    radial-gradient(560px 420px at 12% -6%, var(--aurora-1), transparent 62%),
-    radial-gradient(720px 540px at 88% 4%, var(--aurora-2), transparent 64%),
-    radial-gradient(680px 500px at 50% 112%, var(--aurora-3), transparent 62%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* 液态基底：固定极光层缓慢漂移（compositor 动画，不触发重排），
+   玻璃面板的 backdrop-blur 打在这层色晕上，“透”感来自这里 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -12%;
+  z-index: -1;
+  background:
+    radial-gradient(620px 460px at 16% 4%, var(--aurora-1), transparent 62%),
+    radial-gradient(780px 560px at 86% 10%, var(--aurora-2), transparent 64%),
+    radial-gradient(740px 540px at 50% 108%, var(--aurora-3), transparent 62%);
+  animation: aurora-drift 26s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes aurora-drift {
+  from {
+    transform: translate3d(-1.5%, -1.5%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2%, 2.5%, 0) scale(1.07);
+  }
 }
 
 button,
