@@ -48,8 +48,10 @@ def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, em
     reasoning_parts = []
     answer_parts = []
     message = None
+    # 注意：首个参数必须按位置传——各 agent 实现的形参名不统一（messages/history），
+    # 关键字传参会 TypeError
+    call_args = [history]
     call_kwargs = {
-        "history": history,
         "tools": tools,
         "system_prompt": system_prompt,
         "tool_choice": "auto",
@@ -57,7 +59,7 @@ def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, em
     }
     if max_tokens is not None:
         call_kwargs["max_tokens"] = max_tokens
-    for kind, payload in agent.stream_chat_with_tools(**call_kwargs):
+    for kind, payload in agent.stream_chat_with_tools(*call_args, **call_kwargs):
         if kind == "reasoning":
             reasoning_parts.append(payload)
             emit("thought_delta", {"text": payload, "turn": turn_number})

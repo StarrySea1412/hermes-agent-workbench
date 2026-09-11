@@ -128,6 +128,8 @@ $env:API_SERVER_ENABLED = "true"
 $env:API_SERVER_HOST = "127.0.0.1"
 $env:API_SERVER_PORT = "8642"
 $env:API_SERVER_KEY = "dev-test-key-for-local"
+# 后端调用网关用的是同一个服务密钥，必须保持一致，否则网关返回 401
+$env:HERMES_GATEWAY_KEY = "dev-test-key-for-local"
 if (!$env:API_SERVER_MODEL_NAME) {
     $modelFromConfig = Get-HermesModelName -ConfigPath (Join-Path $HermesHome "config.yaml")
     if ($modelFromConfig) {
@@ -136,6 +138,19 @@ if (!$env:API_SERVER_MODEL_NAME) {
 }
 $env:API_SERVER_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000"
 $env:HERMES_ACCEPT_HOOKS = "1"
+
+# Anthropic 协议的网关运行时需要 ANTHROPIC_API_KEY 环境变量（hermes 入口强制校验），
+# 从 config.yaml 取同一家密钥注入，避免设置页切换供应商后网关起不来。
+$gatewayConfigPath = Join-Path $HermesHome "config.yaml"
+if ((Test-Path -LiteralPath $gatewayConfigPath) -and -not $env:ANTHROPIC_API_KEY) {
+    $configText = Get-Content -LiteralPath $gatewayConfigPath -Raw -ErrorAction SilentlyContinue
+    if ($configText -match '(?m)^\s*provider:\s*anthropic\s*$') {
+        $keyMatch = [regex]::Match($configText, '(?m)^\s*api_key:\s*(\S+)')
+        if ($keyMatch.Success) {
+            $env:ANTHROPIC_API_KEY = $keyMatch.Groups[1].Value.Trim()
+        }
+    }
+}
 
 $HermesExe = Resolve-HermesExecutable
 if (!$HermesExe) {

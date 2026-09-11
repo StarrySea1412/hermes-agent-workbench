@@ -104,6 +104,33 @@ class ToolLoopReasoningTests(SimpleTestCase):
         self.assertFalse(any(item.get("source") == "model" for kind, payload in events if kind == "thought" for item in [payload]))
 
 
+class ToolLoopStrictSignatureTests(SimpleTestCase):
+    """回归：tool_loop 必须按位置传 history。
+
+    各 agent 实现的流式首参名不同（messages/history），关键字传参会 TypeError
+    导致整条链路误判为不支持流式（2026-09-10 实际事故）。
+    """
+
+    def test_stream_agent_with_messages_signature_works(self):
+        calls = []
+
+        def stream(self_ref, messages, tools=None, system_prompt=None, tool_choice='auto', extra_headers=None, max_tokens=None):
+            calls.append({'n_messages': len(messages), 'max_tokens': max_tokens})
+            yield ('answer', '位置传参正常。')
+            yield ('final', SimpleNamespace(content='位置传参正常。', tool_calls=None))
+
+        agent = SimpleNamespace(stream_chat_with_tools=lambda *a, **k: stream(None, *a, **k))
+        result = run_tool_loop(
+            agent=agent,
+            history=[{'role': 'user', 'content': 'hi'}],
+            tool_names=[],
+            build_system_prompt=lambda native, text: '',
+            tool_context={},
+            max_turns=2,
+        )
+        self.assertEqual(result.reply, '位置传参正常。')
+        self.assertEqual(calls[0]['n_messages'], 1)
+
 class ToolLoopThinkingBudgetTests(SimpleTestCase):
     """回归：推理型模型把输出预算耗尽在思考链上时（只有思考、没有正文），应放大 max_tokens 重试而不是返回空回复。"""
 

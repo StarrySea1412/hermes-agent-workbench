@@ -71,9 +71,11 @@ def get_hermes_config_path():
         home_path.mkdir(parents=True, exist_ok=True)
         return home_path / "config.yaml"
 
-    hermes_dir = Path.home() / ".hermes"
-    hermes_dir.mkdir(exist_ok=True)
-    return hermes_dir / "config.yaml"
+    # 兜底到仓库根的 .hermes-runtime，避免后端进程缺 HERMES_HOME 时
+    # 把网关配置写到 ~/.hermes 造成网关与后端各读一份配置
+    repo_runtime = Path(__file__).resolve().parents[2] / ".hermes-runtime"
+    repo_runtime.mkdir(parents=True, exist_ok=True)
+    return repo_runtime / "config.yaml"
 
 
 def load_existing_config(config_path):
@@ -123,6 +125,12 @@ def sync_hermes_config_for_user(user):
         "temperature": config.temperature,
         "max_tokens": max(config.max_tokens, 4000),
     }
+
+    # context_length 属于手工调优字段（避免 Hermes 每轮对话都向上游探测上下文长度、
+    # 消耗中转站的限流配额），同步时从现有配置继承，不要清掉。
+    existing_model_context_length = (existing.get("model") or {}).get("context_length")
+    if existing_model_context_length:
+        hermes_config["model"]["context_length"] = existing_model_context_length
 
     if base_url and base_url != DEFAULT_HERMES_BASE_URL:
         hermes_config["model"]["base_url"] = base_url

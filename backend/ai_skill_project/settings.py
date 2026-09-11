@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / '.env')
+load_dotenv(BASE_DIR / '.env', override=True)
 
 # ──────────────────────────────────────────────
 # 核心安全配置 — 从环境变量读取
