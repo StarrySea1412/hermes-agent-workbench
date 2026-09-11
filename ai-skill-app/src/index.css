@@ -677,13 +677,35 @@ select:focus-visible {
     box-shadow 0.2s ease;
 }
 
-/* 边缘环聚光灯：radial 光斑经 mask 抠出 1px 边缘环，
-   鼠标滑过时沿边框流向指针位置——真实玻璃的边缘折射 */
+/* 内部眩光：::before 画在内容下方（不遮文字）；指针附近的柔和光区 */
 .panel::before,
 .metric-card::before,
 .run-card::before,
 .template-card::before,
 .timeline-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    320px circle at var(--mx, 50%) var(--my, 50%),
+    var(--glass-glare-hover),
+    transparent 65%
+  );
+  opacity: 0;
+  transition:
+    opacity 0.25s ease,
+    --glass-glare 0.25s ease;
+  pointer-events: none;
+}
+
+/* 边缘环聚光灯：::after 画在最上层，radial 光斑经 mask 抠出 1px 边缘环，
+   鼠标滑过时沿边框流向指针位置——真实玻璃的边缘折射 */
+.panel::after,
+.metric-card::after,
+.run-card::after,
+.template-card::after,
+.timeline-item::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -699,26 +721,6 @@ select:focus-visible {
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-}
-
-/* 内部眩光：指针附近的柔和光区，随指针滑动 */
-.panel::after,
-.metric-card::after,
-.run-card::after,
-.template-card::after,
-.timeline-item::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(
-    320px circle at var(--mx, 50%) var(--my, 50%),
-    var(--glass-glare-hover),
-    transparent 65%
-  );
   opacity: 0;
   transition: opacity 0.25s ease;
   pointer-events: none;

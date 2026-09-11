@@ -204,8 +204,12 @@ def conversation_stream(request, conversation_id):
     _refresh_conversation_title(conversation, content)
 
     def event_stream():
+        reply_parts = []
+        interrupted = False
         try:
             for event, data in service.stream_turn(conversation, content, attachment_ids=attachments):
+                if event == "delta":
+                    reply_parts.append(data.get("content", ""))
                 if event == "done":
                     reply = data.get("reply", "")
                     metadata = data.get("metadata", {})
@@ -237,6 +241,10 @@ def conversation_stream(request, conversation_id):
                     yield _sse("done", payload)
                     continue
                 yield _sse(event, data)
+        except GeneratorExit:
+            # 客户端断开（点了停止 / 关闭页面）：标记中断，保留已生成的部分回复
+            interrupted = True
+            raise
         except Exception as exc:
             logger.exception("Conversation stream failed: conversation_id=%s user_id=%s", conversation.id, request.user.id)
             diagnostic = describe_ai_exception(exc)
@@ -244,6 +252,22 @@ def conversation_stream(request, conversation_id):
                 "message": diagnostic.get("message") or str(exc),
                 "diagnostic": diagnostic,
             })
+        finally:
+            if interrupted and reply_parts:
+                partial = "".join(reply_parts).strip()
+                if partial:
+                    try:
+                        service.save_assistant_message(conversation, partial, metadata={
+                            "gateway": "hermes",
+                            "interrupted": True,
+                            "mode": conversation.mode,
+                        })
+                    except Exception:
+                        logger.exception(
+                            "Failed to save interrupted reply: conversation_id=%s user_id=%s",
+                            conversation.id,
+                            request.user.id,
+                        )
 
     response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"

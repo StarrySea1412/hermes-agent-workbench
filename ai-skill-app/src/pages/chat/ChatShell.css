@@ -566,12 +566,32 @@
     box-shadow 0.2s ease;
 }
 
-/* 边缘环聚光灯 + 内部眩光：与全局 .panel 系列同一配方 */
+/* 内部眩光：::before 画在内容下方（不遮文字） */
 .chat-app .home-highlight::before,
 .chat-app .project-card::before,
 .chat-app .export-panel::before,
 .chat-app .outline-card::before,
 .chat-app .files-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    320px circle at var(--mx, 50%) var(--my, 50%),
+    var(--glass-glare-hover),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+/* 边缘环聚光灯：::after 画在最上层，光斑经 mask 抠出 1px 边缘环 */
+.chat-app .home-highlight::after,
+.chat-app .project-card::after,
+.chat-app .export-panel::after,
+.chat-app .outline-card::after,
+.chat-app .files-panel::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -587,25 +607,6 @@
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-}
-
-.chat-app .home-highlight::after,
-.chat-app .project-card::after,
-.chat-app .export-panel::after,
-.chat-app .outline-card::after,
-.chat-app .files-panel::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(
-    320px circle at var(--mx, 50%) var(--my, 50%),
-    var(--glass-glare-hover),
-    transparent 65%
-  );
   opacity: 0;
   transition: opacity 0.25s ease;
   pointer-events: none;
