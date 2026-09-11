@@ -3,7 +3,7 @@
   grid-template-columns: 264px minmax(0, 1fr);
   min-height: 100vh;
   min-width: 0;
-  background: var(--bg);
+  background: transparent;
 }
 
 .chat-app .chat-sidebar {
@@ -17,8 +17,10 @@
   padding: 12px 10px;
   overflow: hidden;
   color: var(--ink);
-  background: var(--sidebar);
-  border-right: 1px solid var(--line);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--glass-edge);
 }
 
 /* 侧栏锁一屏：固定区块禁收缩，历史会话列表内部滚动 */
@@ -71,7 +73,7 @@
   height: 28px;
   border-radius: 7px;
   color: var(--primary-fg);
-  background: var(--ink);
+  background: var(--brand-grad);
 }
 
 .chat-app .brand-text {
@@ -170,6 +172,7 @@
   background: var(--active);
   color: var(--ink);
   font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .chat-app .sidebar-nav-link .icon {
@@ -205,8 +208,8 @@
 }
 
 .chat-app .history-search input:focus {
-  border-color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(20, 20, 19, 0.06);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 
 .chat-app .history-search-clear {
@@ -261,8 +264,8 @@
   min-height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  color: var(--muted);
-  background: var(--active);
+  color: var(--primary);
+  background: var(--primary-soft);
   font-size: 10.5px;
   font-weight: 600;
 }
@@ -290,6 +293,7 @@
 
 .chat-app .conversation-item-shell.active {
   background: var(--active);
+  box-shadow: inset 2px 0 0 var(--primary);
 }
 
 .chat-app .conversation-item {
@@ -416,15 +420,15 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #b1b0ae;
+  background: var(--muted);
 }
 
 .chat-app .sidebar-hermes-dot.online {
-  background: #23a55a;
+  background: var(--success);
 }
 
 .chat-app .sidebar-hermes-dot.offline {
-  background: #d5605c;
+  background: var(--danger);
 }
 
 .chat-app .sidebar-hermes-text {
@@ -443,8 +447,8 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  color: var(--muted-strong);
-  background: var(--active);
+  color: var(--primary-fg);
+  background: var(--brand-grad);
 }
 
 .chat-app .sidebar-user-text {
@@ -553,7 +557,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
 }
 
 .chat-app .project-card {

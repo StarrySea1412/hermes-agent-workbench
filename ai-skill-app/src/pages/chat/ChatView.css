@@ -5,7 +5,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--ink);
-  background: var(--bg);
+  background: transparent;
 }
 
 .chat-app .chat-main {
@@ -14,7 +14,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg);
+  background: transparent;
 }
 
 /* ---------------- 顶栏 ---------------- */
@@ -27,8 +27,10 @@
   min-width: 0;
   min-height: 0;
   padding: 10px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
+  border-bottom: 1px solid var(--glass-edge);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 .chat-app .chat-title-block {
@@ -111,7 +113,7 @@
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--bg);
+  background: transparent;
 }
 
 .chat-app .chat-thread {
@@ -121,7 +123,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg);
+  background: transparent;
 }
 
 .chat-app .mobile-runtime-panel {
@@ -192,7 +194,7 @@
 }
 
 .chat-app .thought-label.shimmer {
-  background: linear-gradient(90deg, #6f62c2 25%, #b3a8e8 50%, #6f62c2 75%);
+  background: linear-gradient(90deg, var(--thinking) 25%, var(--thinking-light) 50%, var(--thinking) 75%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -249,7 +251,7 @@
   margin-left: 2px;
   vertical-align: -2px;
   border-radius: 1px;
-  background: var(--ink);
+  background: var(--primary);
   animation: caret-blink 0.9s steps(1) infinite;
 }
 
@@ -276,7 +278,7 @@
 }
 
 .chat-app .thought-item.model strong {
-  color: #6f62c2;
+  color: var(--thinking);
 }
 
 .chat-app .thought-item p {
@@ -317,7 +319,7 @@
 }
 
 .chat-app .task-checklist-label.shimmer {
-  background: linear-gradient(90deg, #6f62c2 25%, #b3a8e8 50%, #6f62c2 75%);
+  background: linear-gradient(90deg, var(--thinking) 25%, var(--thinking-light) 50%, var(--thinking) 75%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -374,14 +376,14 @@
 }
 
 .chat-app .task-checklist-body li.active .task-checklist-mark {
-  border-color: #6f62c2;
+  border-color: var(--thinking);
 }
 
 .chat-app .task-checklist-dot {
   width: 5px;
   height: 5px;
   border-radius: 999px;
-  background: #6f62c2;
+  background: var(--thinking);
   animation: pulse 1s infinite ease-in-out;
 }
 
@@ -398,7 +400,7 @@
   max-height: none;
   overflow: auto;
   padding: 20px clamp(16px, 3vw, 36px) 28px;
-  background: var(--bg);
+  background: transparent;
 }
 
 /* 消息跳转高亮 */
@@ -436,8 +438,10 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-left: 1px solid var(--line);
-  background: var(--sidebar);
+  border-left: 1px solid var(--glass-edge);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 
 .chat-app .chat-timeline-head {
@@ -539,8 +543,8 @@
 }
 
 .chat-app .chat-timeline-item.answer .chat-timeline-icon {
-  color: var(--link);
-  background: var(--info-soft);
+  color: var(--primary);
+  background: var(--primary-soft);
 }
 
 .chat-app .chat-timeline-text {
@@ -630,16 +634,16 @@
   height: 26px;
   border-radius: 7px;
   color: var(--primary-fg);
-  background: var(--ink);
+  background: var(--brand-grad);
 }
 
 .chat-app .message-row.user .message-bubble {
   justify-self: end;
   max-width: min(100%, 560px);
   padding: 10px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--user-bubble-border);
   border-radius: 14px;
-  background: var(--surface-soft);
+  background: var(--user-bubble);
 }
 
 .chat-app .message-row.user .message-role {
@@ -817,7 +821,7 @@
   width: 12px;
   height: 12px;
   border: 2px solid var(--line-strong);
-  border-top-color: #6f62c2;
+  border-top-color: var(--thinking);
   border-radius: 999px;
   animation: tool-spin 0.8s linear infinite;
 }
@@ -853,7 +857,7 @@
 }
 
 .chat-app .tool-trace-row.running .tool-trace-name {
-  color: #6f62c2;
+  color: var(--thinking);
 }
 
 .chat-app .tool-trace-summary {
@@ -1078,12 +1082,37 @@
   gap: 8px;
   width: 100%;
   margin: 0;
-  padding: 12px clamp(16px, 3vw, 36px) 16px;
+  padding: 4px clamp(16px, 3vw, 36px) 14px;
   border: 0;
-  border-top: 1px solid var(--line);
   border-radius: 0;
-  background: var(--bg);
+  background: transparent;
   box-shadow: none;
+}
+
+.chat-app .chat-input-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  max-height: 200px;
+  resize: none;
+  padding: 12px 14px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  color: var(--ink);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
+  font-size: 14px;
+  line-height: 1.55;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-app .chat-input-field textarea:focus {
+  border-color: var(--primary);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), 0 0 0 3px var(--ring),
+    var(--glass-shadow);
 }
 
 .chat-app .chat-notice {
@@ -1096,10 +1125,12 @@
   width: min(560px, calc(100vw - 32px));
   margin: 0;
   padding: 12px 16px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--glass-edge);
   border-radius: var(--radius-lg);
   color: var(--muted-strong);
-  background: var(--surface);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-pop);
   font-size: 12.5px;
   transform: translateX(-50%);
@@ -1233,28 +1264,6 @@
   min-width: 0;
 }
 
-.chat-app .chat-input-field textarea {
-  display: block;
-  width: 100%;
-  min-height: 84px;
-  max-height: 200px;
-  resize: none;
-  padding: 12px 13px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
-  color: var(--ink);
-  background: var(--surface);
-  font-size: 14px;
-  line-height: 1.55;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.chat-app .chat-input-field textarea:focus {
-  border-color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(20, 20, 19, 0.06);
-}
-
 .chat-app .chat-input-footer {
   display: flex;
   align-items: center;
@@ -1378,6 +1387,7 @@
   min-height: 0;
   overflow-y: auto;
   padding: 24px;
+  background: radial-gradient(900px 420px at 50% -8%, var(--hero-glow), transparent 65%);
 }
 
 .chat-app .chat-hero-inner {
@@ -1395,7 +1405,7 @@
   height: 44px;
   border-radius: 12px;
   color: var(--primary-fg);
-  background: var(--ink);
+  background: var(--brand-grad);
 }
 
 .chat-app .chat-hero-title {
@@ -1416,8 +1426,7 @@
 
 .chat-app .chat-hero .chat-input-field textarea {
   min-height: 96px;
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow);
+  border-radius: 20px;
 }
 
 .chat-app .chat-hero .chat-input-footer {
@@ -1445,8 +1454,10 @@
   width: min(340px, 94vw);
   padding: 14px;
   overflow: auto;
-  border-left: 1px solid var(--line);
-  background: var(--bg);
+  border-left: 1px solid var(--glass-edge);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-pop);
   transform: translateX(110%);
   transition: transform 0.22s ease;

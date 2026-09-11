@@ -8,7 +8,7 @@
 .fullScreen {
   width: 100vw;
   height: 100vh;
-  background: #f2f4f7;
+  background: var(--bg-soft);
 }
 
 .spinnerContainer {
@@ -21,8 +21,8 @@
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid #e8eaef;
-  border-top-color: #2289ff;
+  border: 3px solid var(--line-strong);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -35,6 +35,6 @@
 
 .text {
   font-size: 14px;
-  color: #666;
+  color: var(--muted-strong);
   font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", SimHei, Arial, Helvetica, sans-serif;
 }

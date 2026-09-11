@@ -70,7 +70,7 @@
 .advanced-config summary {
   padding: 9px 12px;
   cursor: pointer;
-  color: var(--text, #1f2937);
+  color: var(--ink);
   font-size: 13px;
   font-weight: 700;
   list-style: none;
@@ -168,8 +168,8 @@ details.panel[open] > summary.panel-header {
   padding: 5px 12px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  color: var(--text, #1f2937);
-  background: var(--surface, #ffffff);
+  color: var(--ink);
+  background: var(--surface);
   font-size: 12px;
   font-weight: 700;
   overflow: hidden;
