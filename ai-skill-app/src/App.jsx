@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary'
 import Loading from './components/Loading'
+import { initGlassRefraction } from './lib/glassRefraction'
 import { useAuth } from './hooks/useAuth'
 import AgentRunDetail from './pages/AgentRunDetail'
 import AgentRuns from './pages/AgentRuns'
@@ -50,6 +52,8 @@ function PublicOnlyRoute({ children }) {
 }
 
 export default function App() {
+  useEffect(() => initGlassRefraction(), [])
+
   return (
     <ErrorBoundary>
       <Routes>

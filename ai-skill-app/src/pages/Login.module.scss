@@ -15,7 +15,11 @@
   border: 1px solid transparent;
   border-radius: 18px;
   background:
-    radial-gradient(130% 110% at 10% 0%, var(--glass-glare), transparent 45%)
+    radial-gradient(
+        280px circle at var(--mx, 30%) var(--my, 0%),
+        var(--glass-glare),
+        transparent 62%
+      )
       padding-box,
     linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)) padding-box,
     var(--glass-refraction) border-box;
@@ -23,6 +27,10 @@
   backdrop-filter: var(--glass-blur);
   padding: 36px 32px;
   box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
+  transition:
+    --mx 0.12s linear,
+    --my 0.12s linear,
+    --glass-glare 0.25s ease;
 }
 
 .logoArea {

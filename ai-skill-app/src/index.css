@@ -1,4 +1,23 @@
-﻿:root {
+﻿/* 指针折射：注册为可插值属性，眩光光斑才能平滑跟随鼠标滑动 */
+@property --mx {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 30%;
+}
+
+@property --my {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+@property --glass-glare {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+:root {
   /* 设计令牌：液态玻璃质感 —— 半透明表面 + 极光底色 + 紫罗兰品牌色 */
   --bg: #ffffff;
   --primary-fg: #ffffff;
@@ -47,8 +66,9 @@
   --glass-sheen: rgba(255, 255, 255, 0.9);
   --glass-blur: blur(28px) saturate(1.8);
   --glass-shadow: 0 8px 28px rgba(20, 20, 19, 0.08);
-  /* 折射：边框光从左上射入、右下带紫/青色散；edge 用于侧栏/时间线等切割边 */
-  --glass-glare: rgba(255, 255, 255, 0.5);
+  /* 折射：边框光从左上射入、右下带紫/青色散；edge 用于侧栏/时间线等切割边。
+     眩光默认熄灭，鼠标滑过面板时经 .glass-hover 点亮并跟随指针（--mx/--my） */
+  --glass-glare-hover: rgba(255, 255, 255, 0.5);
   --glass-refraction: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.95) 0%,
@@ -135,7 +155,7 @@
   --glass-sheen: rgba(255, 255, 255, 0.09);
   --glass-blur: blur(28px) saturate(1.7);
   --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  --glass-glare: rgba(255, 255, 255, 0.07);
+  --glass-glare-hover: rgba(255, 255, 255, 0.12);
   --glass-refraction: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.3) 0%,
@@ -678,11 +698,24 @@ select:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(130% 100% at 10% 0%, var(--glass-glare), transparent 42%)
+    radial-gradient(
+        260px circle at var(--mx, 30%) var(--my, 0%),
+        var(--glass-glare),
+        transparent 62%
+      )
       padding-box,
     linear-gradient(var(--surface), var(--surface)) padding-box,
     var(--glass-refraction) border-box;
   box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
+  transition:
+    --mx 0.12s linear,
+    --my 0.12s linear,
+    --glass-glare 0.25s ease;
+}
+
+/* 鼠标滑过时点亮眩光（glassRefraction.js 维护该类与指针坐标） */
+.glass-hover {
+  --glass-glare: var(--glass-glare-hover);
 }
 
 .panel {
