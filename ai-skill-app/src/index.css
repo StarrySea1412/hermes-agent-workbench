@@ -60,15 +60,24 @@
   --info: #3b6ec1;
   --info-soft: rgba(59, 110, 193, 0.1);
   /* 玻璃面板：背景、描边、顶部高光、模糊滤镜 */
-  --glass-bg: rgba(255, 255, 255, 0.42);
-  --glass-bg-strong: rgba(255, 255, 255, 0.62);
+  --glass-bg: rgba(255, 255, 255, 0.36);
+  --glass-bg-strong: rgba(255, 255, 255, 0.58);
   --glass-edge: rgba(255, 255, 255, 0.7);
   --glass-sheen: rgba(255, 255, 255, 0.9);
   --glass-blur: blur(28px) saturate(1.8);
   --glass-shadow: 0 8px 28px rgba(20, 20, 19, 0.08);
   /* 折射：边框光从左上射入、右下带紫/青色散；edge 用于侧栏/时间线等切割边。
-     眩光默认熄灭，鼠标滑过面板时经 .glass-hover 点亮并跟随指针（--mx/--my） */
-  --glass-glare-hover: rgba(255, 255, 255, 0.5);
+     眬光默认熄灭，鼠标滑过面板时经 .glass-hover 点亮并跟随指针（--mx/--my）：
+     白核 + 紫晕，才是“光穿过玻璃”而不是白上加白 */
+  --glass-glare-hover: rgba(255, 255, 255, 0.75);
+  --glass-glare-halo: rgba(122, 110, 230, 0.16);
+  /* 悬停时边框光流向指针：边框近光处亮起、远光处保持中性 */
+  --glass-edge-hover: radial-gradient(
+    240px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.95),
+    rgba(122, 110, 230, 0.4) 45%,
+    rgba(20, 20, 19, 0.12) 100%
+  );
   --glass-refraction: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.95) 0%,
@@ -151,13 +160,20 @@
   --danger-soft: rgba(224, 112, 112, 0.14);
   --info: #7ba3e0;
   --info-soft: rgba(123, 163, 224, 0.14);
-  --glass-bg: rgba(34, 34, 38, 0.4);
-  --glass-bg-strong: rgba(38, 38, 42, 0.58);
+  --glass-bg: rgba(34, 34, 38, 0.34);
+  --glass-bg-strong: rgba(38, 38, 42, 0.52);
   --glass-edge: rgba(255, 255, 255, 0.1);
   --glass-sheen: rgba(255, 255, 255, 0.09);
   --glass-blur: blur(28px) saturate(1.7);
   --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  --glass-glare-hover: rgba(255, 255, 255, 0.12);
+  --glass-glare-hover: rgba(255, 255, 255, 0.14);
+  --glass-glare-halo: rgba(122, 124, 245, 0.3);
+  --glass-edge-hover: radial-gradient(
+    240px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.55),
+    rgba(122, 124, 245, 0.5) 45%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
   --glass-refraction: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.3) 0%,
@@ -205,16 +221,18 @@ body {
 }
 
 /* 液态基底：固定极光层缓慢漂移（compositor 动画，不触发重排），
-   玻璃面板的 backdrop-blur 打在这层色晕上，“透”感来自这里 */
+   玻璃面板的 backdrop-blur 打在这层色晕上，“透”感来自这里。
+   中部色斑是关键：卡片底下必须有光可折，玻璃才不是普通白卡 */
 body::before {
   content: '';
   position: fixed;
   inset: -12%;
   z-index: -1;
   background:
-    radial-gradient(620px 460px at 16% 4%, var(--aurora-1), transparent 62%),
-    radial-gradient(780px 560px at 86% 10%, var(--aurora-2), transparent 64%),
-    radial-gradient(740px 540px at 50% 108%, var(--aurora-3), transparent 62%);
+    radial-gradient(640px 480px at 14% 2%, var(--aurora-1), transparent 60%),
+    radial-gradient(820px 600px at 88% 8%, var(--aurora-2), transparent 62%),
+    radial-gradient(900px 680px at 58% 46%, var(--aurora-3), transparent 64%),
+    radial-gradient(760px 540px at 48% 106%, var(--aurora-1), transparent 62%);
   animation: aurora-drift 26s ease-in-out infinite alternate;
   pointer-events: none;
 }
@@ -713,10 +731,11 @@ select:focus-visible {
     --glass-glare 0.25s ease;
 }
 
-/* 鼠标滑过时点亮眩光与折射边（glassRefraction.js 维护该类与指针坐标） */
+/* 鼠标滑过时点亮眩光与折射边（glassRefraction.js 维护该类与指针坐标）：
+   光斑跟着指针走，边框近光段亮起紫/青色散、远光段保持中性 */
 .glass-hover {
   --glass-glare: var(--glass-glare-hover);
-  --glass-edge-glow: var(--glass-refraction);
+  --glass-edge-glow: var(--glass-edge-hover);
 }
 
 .panel {

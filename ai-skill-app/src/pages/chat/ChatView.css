@@ -988,8 +988,9 @@
   background:
     radial-gradient(
         220px circle at var(--mx, 30%) var(--my, 0%),
-        var(--glass-glare),
-        transparent 62%
+        var(--glass-glare) 0%,
+        var(--glass-glare-halo) 45%,
+        transparent 68%
       )
       padding-box,
     linear-gradient(var(--surface), var(--surface)) padding-box,
@@ -1163,8 +1164,9 @@
   background:
     radial-gradient(
         260px circle at var(--mx, 30%) var(--my, 0%),
-        var(--glass-glare),
-        transparent 62%
+        var(--glass-glare) 0%,
+        var(--glass-glare-halo) 45%,
+        transparent 68%
       )
       padding-box,
     linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)) padding-box,
@@ -1205,8 +1207,9 @@
   background:
     radial-gradient(
         300px circle at var(--mx, 30%) var(--my, 0%),
-        var(--glass-glare),
-        transparent 62%
+        var(--glass-glare) 0%,
+        var(--glass-glare-halo) 45%,
+        transparent 68%
       )
       padding-box,
     linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)) padding-box,
