@@ -88,16 +88,31 @@ export default function FilesWorkbench() {
                 </div>
               </div>
 
-              <label className="field">
+              <div className="field">
                 <span>文件</span>
-                <input
-                  ref={inputRef}
-                  type="file"
-                  multiple
-                  accept=".pdf,.docx,.doc,.txt,.md"
-                  onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))}
-                />
-              </label>
+                <div className="file-picker-row">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => inputRef.current?.click()}
+                  >
+                    选择文件
+                  </button>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.docx,.doc,.txt,.md"
+                    className="visually-hidden-input"
+                    onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))}
+                  />
+                  <small className="file-picker-hint">
+                    {selectedFiles.length
+                      ? `已选择 ${selectedFiles.length} 个文件`
+                      : '支持 PDF、Word、文本、Markdown'}
+                  </small>
+                </div>
+              </div>
 
               {selectedFiles.length ? (
                 <div className="chip-list">

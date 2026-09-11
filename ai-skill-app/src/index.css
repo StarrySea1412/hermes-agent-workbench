@@ -61,6 +61,7 @@
   font-size: 14px;
   color: var(--ink);
   background: var(--bg);
+  color-scheme: light;
   scrollbar-color: var(--line-strong) transparent;
 }
 
@@ -117,6 +118,7 @@
   --aurora-3: rgba(64, 174, 206, 0.08);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
 }
 
 * {
@@ -1185,6 +1187,27 @@ select:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+/* 自定义文件选择：隐藏原生控件，用主题化按钮触发 */
+.file-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.file-picker-hint {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .checkbox-row input {
