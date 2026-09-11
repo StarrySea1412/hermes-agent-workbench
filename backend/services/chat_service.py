@@ -449,6 +449,10 @@ class ChatService:
             return config_model
         return getattr(agent, "model", "") or ""
 
+    def _get_runtime_base_url(self, agent=None):
+        config = self._get_config()
+        return (getattr(config, "base_url", "") or "") if config else ""
+
     def _fallback_reply(self, conversation, user_content):
         title = conversation.project.title if conversation.project else conversation.title
         session_id = self.get_session_id(conversation)
@@ -619,6 +623,7 @@ class ChatService:
             "gateway": gateway_label,
             "session_id": session_id,
             "model_name": self._get_runtime_model_name(agent),
+            "base_url": self._get_runtime_base_url(agent),
             "mode": conversation.mode,
             "thoughts": thoughts,
             "tool_events": tool_events,

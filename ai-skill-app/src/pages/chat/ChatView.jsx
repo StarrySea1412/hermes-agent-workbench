@@ -2,6 +2,7 @@ import { useRef, useState, useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../../components/Icon'
+import { getHermesMonitor } from '../../api/aiConfig'
 import {
   createConversation,
   deleteConversation,
@@ -57,6 +58,14 @@ export default function ChatView() {
     queryFn: listConversations
   })
 
+  // 网关当前的上游模型/渠道：消息元数据缺失时（如未配置用户级模型）由此兜底
+  const { data: hermesMonitor } = useQuery({
+    queryKey: ['hermesMonitor'],
+    queryFn: () => getHermesMonitor(),
+    refetchInterval: 60000,
+    staleTime: 30000
+  })
+
   const { data: conversation, isLoading } = useQuery({
     queryKey: ['conversation', convId],
     queryFn: () => getConversation(convId),
@@ -68,6 +77,10 @@ export default function ChatView() {
     ? draft.messages
     : (conversation?.messages || [])
   const runtime = buildRuntimeSnapshot(conversation, messages, aiConfig)
+  if (!runtime.modelName && hermesMonitor?.upstream_model) {
+    runtime.modelName = hermesMonitor.upstream_model
+    runtime.baseUrl = runtime.baseUrl || hermesMonitor.upstream_base_url || ''
+  }
 
   const createMutation = useMutation({
     mutationFn: createConversation,
@@ -501,7 +514,9 @@ export default function ChatView() {
               onClick={() => setRuntimeOpen((open) => !open)}
             >
               <Icon name="spark" size={14} />
-              {runtime.modelName || '未配置模型'}
+              {runtime.modelName
+                ? `${runtime.modelName} · ${channelLabel(runtime.baseUrl)}`
+                : '未配置模型'}
             </button>
             {convId ? (
               <button
@@ -523,7 +538,11 @@ export default function ChatView() {
             <details className="mobile-runtime-panel">
               <summary>
                 <span>{runtime.gatewayLabel}</span>
-                <small>{runtime.modelName || '未配置模型'}</small>
+                <small>
+                  {runtime.modelName
+                    ? `${runtime.modelName} · ${channelLabel(runtime.baseUrl)}`
+                    : '未配置模型'}
+                </small>
               </summary>
               <InsightPanel project={conversation?.project} runtime={runtime} compact />
             </details>
@@ -753,6 +772,18 @@ async function copyText(text) {
     return false
   }
   return false
+}
+
+// 渠道标签：从 base_url 提取主机名（如 ai.venlacy.com），本机网关与缺省分别标注
+function channelLabel(baseUrl) {
+  if (!baseUrl) return '默认渠道'
+  try {
+    const host = new URL(baseUrl).hostname.replace(/^www\./, '')
+    if (!host || host === 'localhost' || host === '127.0.0.1') return '本地网关'
+    return host
+  } catch {
+    return '自定义渠道'
+  }
 }
 
 function buildRuntimeSnapshot(conversation, messages, aiConfig) {

@@ -17,10 +17,8 @@
   padding: 12px 10px;
   overflow: hidden;
   color: var(--ink);
-  border-right: 1px solid transparent;
-  background:
-    linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
-    var(--glass-refraction-edge) border-box;
+  border-right: 1px solid var(--line);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
@@ -567,7 +565,7 @@
       )
       padding-box,
     linear-gradient(var(--surface), var(--surface)) padding-box,
-    var(--glass-refraction) border-box;
+    var(--glass-edge-glow) border-box;
   box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
   transition:
     --mx 0.12s linear,

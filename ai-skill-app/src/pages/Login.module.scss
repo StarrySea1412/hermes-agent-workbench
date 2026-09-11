@@ -22,7 +22,7 @@
       )
       padding-box,
     linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)) padding-box,
-    var(--glass-refraction) border-box;
+    var(--glass-edge-glow) border-box;
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   padding: 36px 32px;

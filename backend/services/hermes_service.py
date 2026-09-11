@@ -144,6 +144,18 @@ def get_hermes_monitor(timeout: float = 3.0, run_chat_probe: bool = False) -> Di
         "checked_at": checked_at,
     }
 
+    # 网关当前的上游模型与渠道（读 config.yaml），供前端标注"模型 · 渠道"
+    try:
+        from services.hermes_config_sync import get_hermes_config_path, load_existing_config
+
+        gateway_cfg = load_existing_config(get_hermes_config_path()) or {}
+        model_cfg = gateway_cfg.get("model") or {}
+        result["upstream_model"] = model_cfg.get("default") or model_cfg.get("name") or ""
+        result["upstream_base_url"] = model_cfg.get("base_url") or ""
+    except Exception:
+        result["upstream_model"] = ""
+        result["upstream_base_url"] = ""
+
     tcp_start = time.perf_counter()
     try:
         with socket.create_connection((host, port), timeout=timeout):
