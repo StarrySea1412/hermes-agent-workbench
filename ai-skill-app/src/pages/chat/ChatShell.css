@@ -553,25 +553,72 @@
 .chat-app .export-panel,
 .chat-app .outline-card,
 .chat-app .files-panel {
+  position: relative;
   min-width: 0;
   padding: 18px;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(
-        260px circle at var(--mx, 30%) var(--my, 0%),
-        var(--glass-glare) 0%,
-        var(--glass-glare-halo) 45%,
-        transparent 68%
-      )
-      padding-box,
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    var(--glass-edge-glow) border-box;
+  background: var(--surface);
   box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
   transition:
-    --mx 0.12s linear,
-    --my 0.12s linear,
-    --glass-glare 0.25s ease;
+    --glass-glare 0.25s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
+}
+
+/* 边缘环聚光灯 + 内部眩光：与全局 .panel 系列同一配方 */
+.chat-app .home-highlight::before,
+.chat-app .project-card::before,
+.chat-app .export-panel::before,
+.chat-app .outline-card::before,
+.chat-app .files-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 50%),
+    var(--glass-ring-core),
+    var(--glass-ring-halo) 40%,
+    transparent 72%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.chat-app .home-highlight::after,
+.chat-app .project-card::after,
+.chat-app .export-panel::after,
+.chat-app .outline-card::after,
+.chat-app .files-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    320px circle at var(--mx, 50%) var(--my, 50%),
+    var(--glass-glare-hover),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.glass-hover::before,
+.glass-hover::after {
+  opacity: 1;
+}
+
+.chat-app .composer-chips button,
+.chat-app .starter-grid.compact button {
+  border-radius: 999px;
 }
 
 .chat-app .project-card {

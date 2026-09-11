@@ -59,56 +59,30 @@
   --danger-soft: rgba(199, 53, 53, 0.09);
   --info: #3b6ec1;
   --info-soft: rgba(59, 110, 193, 0.1);
-  /* 玻璃面板：背景、描边、顶部高光、模糊滤镜 */
-  --glass-bg: rgba(255, 255, 255, 0.36);
-  --glass-bg-strong: rgba(255, 255, 255, 0.58);
+  /* 玻璃面板（iOS Liquid Glass）：奶白半透明、顶部高光的果冻体积感 */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-strong: rgba(255, 255, 255, 0.72);
   --glass-edge: rgba(255, 255, 255, 0.7);
-  --glass-sheen: rgba(255, 255, 255, 0.9);
-  --glass-blur: blur(28px) saturate(1.8);
-  --glass-shadow: 0 8px 28px rgba(20, 20, 19, 0.08);
-  /* 折射：边框光从左上射入、右下带紫/青色散；edge 用于侧栏/时间线等切割边。
-     眬光默认熄灭，鼠标滑过面板时经 .glass-hover 点亮并跟随指针（--mx/--my）：
-     白核 + 紫晕，才是“光穿过玻璃”而不是白上加白 */
-  --glass-glare-hover: rgba(255, 255, 255, 0.75);
-  --glass-glare-halo: rgba(122, 110, 230, 0.16);
-  /* 悬停时边框光流向指针：边框近光处亮起、远光处保持中性 */
-  --glass-edge-hover: radial-gradient(
-    240px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(255, 255, 255, 0.95),
-    rgba(122, 110, 230, 0.4) 45%,
-    rgba(20, 20, 19, 0.12) 100%
-  );
-  --glass-refraction: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.35) 30%,
-    rgba(20, 20, 19, 0.08) 55%,
-    rgba(122, 110, 230, 0.3) 80%,
-    rgba(64, 174, 206, 0.32) 100%
-  );
-  --glass-refraction-edge: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.85) 0%,
-    rgba(255, 255, 255, 0.25) 45%,
-    rgba(122, 110, 230, 0.3) 100%
-  );
-  --glass-refraction-edge-h: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.85) 0%,
-    rgba(255, 255, 255, 0.25) 45%,
-    rgba(122, 110, 230, 0.3) 100%
-  );
-  /* 边框光默认熄灭（中性描边），.glass-hover 时切换为折射渐变 */
-  --glass-edge-glow: linear-gradient(var(--line), var(--line));
+  --glass-sheen: rgba(255, 255, 255, 0.95);
+  --glass-blur: blur(24px) saturate(1.8);
+  --glass-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px rgba(20, 20, 19, 0.05),
+    0 10px 30px rgba(20, 20, 19, 0.08);
+  /* 指针折射：白核高光贴着指针走，无鼠标时完全安静 */
+  --glass-glare-hover: rgba(255, 255, 255, 0.45);
+  --glass-glare-halo: rgba(255, 255, 255, 0.12);
+  --glass-ring-core: rgba(255, 255, 255, 0.95);
+  --glass-ring-halo: rgba(255, 255, 255, 0.3);
   /* 极光色晕：低饱和紫/蓝/青 */
   --aurora-1: rgba(122, 110, 230, 0.3);
   --aurora-2: rgba(76, 106, 220, 0.22);
   --aurora-3: rgba(64, 174, 206, 0.18);
   --shadow: 0 1px 2px rgba(20, 20, 19, 0.05);
   --shadow-pop: 0 12px 32px rgba(20, 20, 19, 0.14);
-  --radius: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
@@ -160,40 +134,19 @@
   --danger-soft: rgba(224, 112, 112, 0.14);
   --info: #7ba3e0;
   --info-soft: rgba(123, 163, 224, 0.14);
-  --glass-bg: rgba(34, 34, 38, 0.34);
-  --glass-bg-strong: rgba(38, 38, 42, 0.52);
-  --glass-edge: rgba(255, 255, 255, 0.1);
-  --glass-sheen: rgba(255, 255, 255, 0.09);
-  --glass-blur: blur(28px) saturate(1.7);
-  --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  --glass-glare-hover: rgba(255, 255, 255, 0.14);
-  --glass-glare-halo: rgba(122, 124, 245, 0.3);
-  --glass-edge-hover: radial-gradient(
-    240px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(255, 255, 255, 0.55),
-    rgba(122, 124, 245, 0.5) 45%,
-    rgba(0, 0, 0, 0.4) 100%
-  );
-  --glass-refraction: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.3) 0%,
-    rgba(255, 255, 255, 0.08) 30%,
-    rgba(0, 0, 0, 0.3) 55%,
-    rgba(122, 124, 245, 0.4) 80%,
-    rgba(64, 174, 206, 0.32) 100%
-  );
-  --glass-refraction-edge: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.35) 0%,
-    rgba(255, 255, 255, 0.08) 45%,
-    rgba(122, 124, 245, 0.35) 100%
-  );
-  --glass-refraction-edge-h: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.35) 0%,
-    rgba(255, 255, 255, 0.08) 45%,
-    rgba(122, 124, 245, 0.35) 100%
-  );
+  --glass-bg: rgba(44, 44, 50, 0.5);
+  --glass-bg-strong: rgba(40, 40, 46, 0.62);
+  --glass-edge: rgba(255, 255, 255, 0.12);
+  --glass-sheen: rgba(255, 255, 255, 0.18);
+  --glass-blur: blur(24px) saturate(1.7);
+  --glass-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.16),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.3),
+    0 10px 30px rgba(0, 0, 0, 0.45);
+  --glass-glare-hover: rgba(255, 255, 255, 0.08);
+  --glass-glare-halo: rgba(255, 255, 255, 0.06);
+  --glass-ring-core: rgba(255, 255, 255, 0.5);
+  --glass-ring-halo: rgba(255, 255, 255, 0.14);
   --aurora-1: rgba(109, 111, 232, 0.32);
   --aurora-2: rgba(76, 106, 220, 0.24);
   --aurora-3: rgba(64, 174, 206, 0.15);
@@ -713,29 +666,77 @@ select:focus-visible {
 .run-card,
 .template-card,
 .timeline-item {
-  border: 1px solid transparent;
+  position: relative;
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(
-        260px circle at var(--mx, 30%) var(--my, 0%),
-        var(--glass-glare),
-        transparent 62%
-      )
-      padding-box,
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    var(--glass-edge-glow) border-box;
+  background: var(--surface);
   box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
   transition:
-    --mx 0.12s linear,
-    --my 0.12s linear,
-    --glass-glare 0.25s ease;
+    --glass-glare 0.25s ease,
+    transform 0.18s ease,
+    box-shadow 0.2s ease;
 }
 
-/* 鼠标滑过时点亮眩光与折射边（glassRefraction.js 维护该类与指针坐标）：
-   光斑跟着指针走，边框近光段亮起紫/青色散、远光段保持中性 */
+/* 边缘环聚光灯：radial 光斑经 mask 抠出 1px 边缘环，
+   鼠标滑过时沿边框流向指针位置——真实玻璃的边缘折射 */
+.panel::before,
+.metric-card::before,
+.run-card::before,
+.template-card::before,
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 50%),
+    var(--glass-ring-core),
+    var(--glass-ring-halo) 40%,
+    transparent 72%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+/* 内部眩光：指针附近的柔和光区，随指针滑动 */
+.panel::after,
+.metric-card::after,
+.run-card::after,
+.template-card::after,
+.timeline-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    320px circle at var(--mx, 50%) var(--my, 50%),
+    var(--glass-glare-hover),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+/* 鼠标滑过：点亮边缘环 + 内部眩光，面板轻微上浮 */
 .glass-hover {
   --glass-glare: var(--glass-glare-hover);
-  --glass-edge-glow: var(--glass-edge-hover);
+}
+
+.glass-hover::before,
+.glass-hover::after {
+  opacity: 1;
+}
+
+.glass-hover:not(textarea) {
+  transform: translateY(-1px) scale(1.012);
+  box-shadow: var(--glass-shadow), 0 14px 34px rgba(20, 20, 19, 0.12);
 }
 
 .panel {
@@ -1307,6 +1308,18 @@ select:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+/* iOS Liquid Glass：操作控件一律胶囊形 */
+.primary-button,
+.secondary-button,
+.back-link,
+.run-filter-chip,
+.file-uploader,
+.artifact-link,
+.export-actions button,
+.run-list-controls .secondary-button {
+  border-radius: 999px;
 }
 
 /* 自定义文件选择：隐藏原生控件，用主题化按钮触发 */

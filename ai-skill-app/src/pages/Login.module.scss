@@ -10,9 +10,10 @@
 }
 
 .loginCard {
+  position: relative;
   width: 100%;
   max-width: 380px;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: 18px;
   background:
     radial-gradient(
@@ -23,15 +24,38 @@
       )
       padding-box,
     linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong)) padding-box,
-    var(--glass-edge-glow) border-box;
+    var(--bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   padding: 36px 32px;
   box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
   transition:
-    --mx 0.12s linear,
-    --my 0.12s linear,
     --glass-glare 0.25s ease;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: radial-gradient(
+      280px circle at var(--mx, 50%) var(--my, 50%),
+      var(--glass-ring-core),
+      var(--glass-ring-halo) 40%,
+      transparent 72%
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+  }
+
+  &.glass-hover::before {
+    opacity: 1;
+  }
 }
 
 .logoArea {
