@@ -1403,6 +1403,22 @@ select:focus-visible {
   animation: pulse 1s infinite ease-in-out;
 }
 
+/* 次级卡片统一玻璃高光：与 .panel 等主卡片同一质感语言 */
+.workbench-flow-card,
+.artifact-card,
+.skill-card,
+.memory-card,
+.tool-card,
+.file-card,
+.checkbox-row,
+.tool-option,
+.memory-option,
+.file-option,
+.artifact-file-card,
+.runs-row {
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+}
+
 .artifact-links {
   display: grid;
   gap: 8px;
@@ -1518,6 +1534,32 @@ select:focus-visible {
 @keyframes pulse {
   50% {
     opacity: 0.3;
+  }
+}
+
+/* 动画降级：用户偏好减少动效时停掉装饰性动画 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 玻璃回退：不支持 backdrop-filter 的浏览器用更实的表面保证可读性 */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.94);
+    --glass-bg-strong: rgba(255, 255, 255, 0.97);
+  }
+
+  :root[data-theme='dark'] {
+    --glass-bg: rgba(30, 30, 34, 0.96);
+    --glass-bg-strong: rgba(32, 32, 36, 0.98);
   }
 }
 

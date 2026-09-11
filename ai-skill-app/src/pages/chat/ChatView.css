@@ -941,6 +941,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
 }
 
 .chat-app .message-artifact-format {
@@ -1054,10 +1055,13 @@
 .chat-app .starter-grid.compact button,
 .chat-app .composer-chips button {
   min-width: 0;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   color: var(--ink);
-  background: var(--surface);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
   font-size: 12.5px;
   font-weight: 500;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
@@ -1531,6 +1535,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
 }
 
 .chat-app .insight-panel.compact {
@@ -1588,6 +1593,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
 }
 
 .chat-app .studio-setting-row div {
@@ -1641,6 +1647,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
 }
 
 .chat-app .runtime-metric span {
@@ -1709,6 +1716,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
 }
 
 .chat-app .runtime-event strong,
