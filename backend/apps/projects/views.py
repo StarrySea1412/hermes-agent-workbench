@@ -253,7 +253,22 @@ def conversation_stream(request, conversation_id):
                 "diagnostic": diagnostic,
             })
         finally:
-            if interrupted and reply_parts:
+            if interrupted:
+                # 中断的聊天轮次：保存半截回复，并把关联运行标记为已取消（避免僵尸“运行中”）
+                try:
+                    from apps.agents.models import AgentRun
+
+                    AgentRun.objects.filter(
+                        user=request.user,
+                        conversation=conversation,
+                        source="chat_turn",
+                        status__in=["pending", "running"],
+                    ).update(status="cancelled", error="已由用户中断")
+                except Exception:
+                    logger.exception(
+                        "Failed to cancel interrupted AgentRun: conversation_id=%s",
+                        conversation.id,
+                    )
                 partial = "".join(reply_parts).strip()
                 if partial:
                     try:
