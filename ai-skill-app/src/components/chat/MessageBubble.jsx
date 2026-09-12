@@ -57,7 +57,8 @@ export default function MessageBubble({ message, pending, isLast = false, onRege
               </span>
               <small>{thinkingActive ? '流式输出中' : `${thoughtCount} 条`}</small>
             </button>
-            <div className="thought-body" ref={thinkBodyRef}>
+            {/* Codex 式：思考中流式展开，完成后自动收起为一行摘要 */}
+            <div className={`thought-body ${thinkingActive ? '' : 'collapsed'}`} ref={thinkBodyRef}>
               {thoughts.map((thought, index) => (
                 <article key={`${thought.title || 'step'}-${index}`} className={`thought-item ${thought.source === 'model' ? 'model' : ''}`}>
                   <strong>{thought.source === 'model' ? '模型思考' : (thought.title || `第 ${index + 1} 步`)}</strong>
