@@ -4,23 +4,19 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   createConversation,
   getProject,
-  listConversations,
   uploadProjectFiles,
 } from '../../api/projects'
-import ChatSidebar from '../../components/chat/ChatSidebar'
+import ChatFrame from '../../components/chat/ChatFrame'
 import ExportPanel from '../../components/chat/ExportPanel'
 import OutlineCard from '../../components/chat/OutlineCard'
-import { useAuth } from '../../hooks/useAuth'
 import './ChatShell.css'
 
 export default function ProjectDetail() {
   const { projectId } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user, logout, isLocalMode } = useAuth()
   const [uploadStatus, setUploadStatus] = useState('')
 
-  const { data: conversations = [] } = useQuery({ queryKey: ['conversations'], queryFn: listConversations })
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => getProject(projectId),
@@ -34,10 +30,6 @@ export default function ProjectDetail() {
       navigate(`/chat/${conversation.id}`)
     }
   })
-
-  const createWorkspace = () => {
-    createMutation.mutate({ title: '新对话', mode: 'chat' })
-  }
 
   const continueProject = () => {
     if (!project) return
@@ -64,15 +56,7 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className="chat-app">
-      <ChatSidebar
-        conversations={conversations}
-        onNewChat={createWorkspace}
-        user={user}
-        onLogout={logout}
-        isLocalMode={isLocalMode}
-      />
-
+    <ChatFrame>
       <main className="project-detail-main">
         {isLoading ? (
           <div className="loading-state">正在加载工作空间...</div>
@@ -116,6 +100,6 @@ export default function ProjectDetail() {
           </>
         )}
       </main>
-    </div>
+    </ChatFrame>
   )
 }

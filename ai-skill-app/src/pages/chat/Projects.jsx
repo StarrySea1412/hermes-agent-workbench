@@ -1,15 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { createConversation, listConversations, listProjects } from '../../api/projects'
-import ChatSidebar from '../../components/chat/ChatSidebar'
-import { useAuth } from '../../hooks/useAuth'
+import { createConversation, listProjects } from '../../api/projects'
+import ChatFrame from '../../components/chat/ChatFrame'
 import './ChatShell.css'
 
 export default function Projects() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user, logout, isLocalMode } = useAuth()
-  const { data: conversations = [] } = useQuery({ queryKey: ['conversations'], queryFn: listConversations })
   const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: listProjects })
 
   const createMutation = useMutation({
@@ -25,15 +22,7 @@ export default function Projects() {
   }
 
   return (
-    <div className="chat-app">
-      <ChatSidebar
-        conversations={conversations}
-        onNewChat={createWorkspace}
-        user={user}
-        onLogout={logout}
-        isLocalMode={isLocalMode}
-      />
-
+    <ChatFrame>
       <main className="projects-main">
         <header className="projects-header">
           <div>
@@ -65,7 +54,7 @@ export default function Projects() {
           </div>
         )}
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 
