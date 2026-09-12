@@ -103,7 +103,7 @@ export default function MessageBubble({ message, pending, isLast = false, onRege
                       {running ? `正在调用 ${formatToolName(event.name || '工具')}...` : formatToolName(event.name || '工具')}
                     </span>
                     <small className="tool-trace-summary">
-                      {running ? '等待结果...' : (event.result_preview || formatToolStatus(event.status))}
+                      {running ? (event.result_preview || '等待结果...') : (event.result_preview || formatToolStatus(event.status))}
                     </small>
                   </summary>
                   <div className="tool-trace-detail">
@@ -473,8 +473,44 @@ function formatToolName(tool) {
     web_search: '联网搜索',
     doc_export: '文件导出',
     file_write: '文件写入',
+    web_extract: '网页提取',
+    terminal: '终端命令',
+    process: '进程管理',
+    read_terminal: '读取终端',
+    read_file: '读取文件',
+    write_file: '写入文件',
+    patch: '修改文件',
+    search_files: '搜索文件',
+    vision_analyze: '图像分析',
+    image_generate: '图像生成',
+    skills_list: '技能列表',
+    skill_view: '查看技能',
+    skill_manage: '技能管理',
+    text_to_speech: '语音合成',
+    todo: '任务计划',
+    memory: '记忆存取',
+    session_search: '会话检索',
   }
-  return map[tool] || tool || '工具'
+  if (map[tool]) return map[tool]
+  if (tool?.startsWith('browser_')) {
+    const browserMap = {
+      navigate: '打开网页',
+      snapshot: '读取页面',
+      click: '点击',
+      type: '输入',
+      scroll: '滚动',
+      back: '后退',
+      press: '按键',
+      get_images: '获取图片',
+      vision: '看图',
+      console: '控制台',
+      cdp: '调试协议',
+      dialog: '对话框',
+    }
+    const action = browserMap[tool.slice('browser_'.length)]
+    if (action) return `浏览器${action}`
+  }
+  return tool || '工具'
 }
 
 function formatToolStatus(status) {

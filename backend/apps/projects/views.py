@@ -281,7 +281,9 @@ def conversation_stream(request, conversation_id):
                         conversation.id,
                     )
                 partial = "".join(reply_parts).strip()
-                if partial:
+                # 正文还没开始也算有内容：工具已执行时轨迹本身值得留痕，
+                # 前端会以"没有收到可显示的回复"占位并渲染 tool_events
+                if partial or turn_events or turn_thoughts:
                     try:
                         service.save_assistant_message(conversation, partial, metadata={
                             "gateway": turn_gateway,
