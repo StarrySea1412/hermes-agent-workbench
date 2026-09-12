@@ -1,11 +1,9 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listAgentRuns, listAgentTemplates, listAgentTools } from '../api/agents'
-import Sidebar from '../components/workbench/Sidebar'
-import { useAuth } from '../hooks/useAuth'
+import ChatFrame from '../components/chat/ChatFrame'
 
 export default function ToolRegistry() {
-  const { user, logout, isLocalMode } = useAuth()
   const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const { data: templates = [] } = useQuery({ queryKey: ['agentTemplates'], queryFn: listAgentTemplates })
   const { data: tools = [] } = useQuery({ queryKey: ['agentTools'], queryFn: listAgentTools })
@@ -40,9 +38,7 @@ export default function ToolRegistry() {
   const templatedTools = [...templateUsage.values()].filter((items) => items.length).length
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
-
+    <ChatFrame>
       <main className="page">
         <header className="page-header">
           <div>
@@ -100,7 +96,7 @@ export default function ToolRegistry() {
           </div>
         </section>
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 

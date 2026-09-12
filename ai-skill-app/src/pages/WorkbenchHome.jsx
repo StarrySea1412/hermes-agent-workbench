@@ -4,13 +4,11 @@ import { listAgentMemories, listAgentRuns, listAgentTemplates, listAgentTools } 
 import { listFiles } from '../api/files'
 import RunComposer from '../components/workbench/RunComposer'
 import RunStatusBadge from '../components/workbench/RunStatusBadge'
-import Sidebar from '../components/workbench/Sidebar'
+import ChatFrame from '../components/chat/ChatFrame'
 import { useAIConfig, useHermesMonitor, useHermesSkills } from '../hooks/useAIConfig'
-import { useAuth } from '../hooks/useAuth'
 
 export default function WorkbenchHome() {
   const navigate = useNavigate()
-  const { user, logout, isLocalMode } = useAuth()
   const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const { data: templates = [] } = useQuery({ queryKey: ['agentTemplates'], queryFn: listAgentTemplates })
   const { data: memories = [] } = useQuery({ queryKey: ['agentMemories'], queryFn: () => listAgentMemories() })
@@ -55,9 +53,7 @@ export default function WorkbenchHome() {
   ]
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
-
+    <ChatFrame>
       <main className="page">
         <header className="page-header">
           <div>
@@ -176,7 +172,7 @@ export default function WorkbenchHome() {
           </div>
         </section>
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 

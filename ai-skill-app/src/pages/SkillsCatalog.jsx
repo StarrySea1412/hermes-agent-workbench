@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listAgentTemplates, listAgentRuns } from '../api/agents'
-import Sidebar from '../components/workbench/Sidebar'
+import ChatFrame from '../components/chat/ChatFrame'
 import { useHermesSkillDetail, useHermesSkills } from '../hooks/useAIConfig'
-import { useAuth } from '../hooks/useAuth'
 
 export default function SkillsCatalog() {
-  const { user, logout, isLocalMode } = useAuth()
   const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const { data: templates = [] } = useQuery({ queryKey: ['agentTemplates'], queryFn: listAgentTemplates })
   const { data: skills = [] } = useHermesSkills()
@@ -32,9 +30,7 @@ export default function SkillsCatalog() {
   const selectedTemplateNames = selectedSkill ? (templateBySkill.get(selectedSkill.path) || []) : []
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
-
+    <ChatFrame>
       <main className="page">
         <header className="page-header">
           <div>
@@ -145,7 +141,7 @@ export default function SkillsCatalog() {
           </aside>
         </div>
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 

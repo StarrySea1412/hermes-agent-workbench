@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { cancelAgentRun, executeAgentRunStream, getAgentRun, getAgentRunArtifacts, getAgentRunMemories, listAgentRuns, saveRunAsMemory } from '../api/agents'
+import { cancelAgentRun, executeAgentRunStream, getAgentRun, getAgentRunArtifacts, getAgentRunMemories, saveRunAsMemory } from '../api/agents'
 import { resolveFileUrl } from '../api/files'
 import ArtifactList from '../components/workbench/ArtifactList'
 import MemoryList from '../components/workbench/MemoryList'
 import RunStatusBadge from '../components/workbench/RunStatusBadge'
-import Sidebar from '../components/workbench/Sidebar'
+import ChatFrame from '../components/chat/ChatFrame'
 import RunTimeline from '../components/workbench/RunTimeline'
-import { useAuth } from '../hooks/useAuth'
 
 export default function AgentRunDetail() {
   const { runId } = useParams()
@@ -16,14 +15,12 @@ export default function AgentRunDetail() {
   const queryClient = useQueryClient()
   const streamStartedRef = useRef(false)
   const streamControllerRef = useRef(null)
-  const { user, logout, isLocalMode } = useAuth()
   const [liveSteps, setLiveSteps] = useState([])
   const [liveRun, setLiveRun] = useState(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState('')
   const [memoryNotice, setMemoryNotice] = useState('')
 
-  const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const runQuery = useQuery({
     queryKey: ['agentRun', runId],
     queryFn: () => getAgentRun(runId),
@@ -133,9 +130,7 @@ export default function AgentRunDetail() {
   const canCancel = run?.status === 'pending' || run?.status === 'running'
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
-
+    <ChatFrame>
       <main className="page">
         <header className="page-header">
           <div>
@@ -310,7 +305,7 @@ export default function AgentRunDetail() {
           </div>
         ) : null}
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 

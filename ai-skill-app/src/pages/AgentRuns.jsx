@@ -5,8 +5,7 @@ import { listAgentMemories, listAgentRuns, listAgentTemplates } from '../api/age
 import { listFiles } from '../api/files'
 import RunComposer from '../components/workbench/RunComposer'
 import RunStatusBadge from '../components/workbench/RunStatusBadge'
-import Sidebar from '../components/workbench/Sidebar'
-import { useAuth } from '../hooks/useAuth'
+import ChatFrame from '../components/chat/ChatFrame'
 
 const RUN_FILTERS = [
   { value: 'all', label: '全部' },
@@ -18,7 +17,6 @@ const RUN_FILTERS = [
 
 export default function AgentRuns() {
   const navigate = useNavigate()
-  const { user, logout, isLocalMode } = useAuth()
   const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const { data: templates = [] } = useQuery({ queryKey: ['agentTemplates'], queryFn: listAgentTemplates })
   const { data: memories = [] } = useQuery({ queryKey: ['agentMemories'], queryFn: () => listAgentMemories() })
@@ -59,9 +57,7 @@ export default function AgentRuns() {
   const latestRun = runs[0]
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
-
+    <ChatFrame>
       <main className="page">
         <header className="page-header">
           <div>
@@ -181,7 +177,7 @@ export default function AgentRuns() {
           </div>
         </section>
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 

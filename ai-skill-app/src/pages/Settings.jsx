@@ -1,8 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { listAgentRuns } from '../api/agents'
-import Sidebar from '../components/workbench/Sidebar'
-import { useAuth } from '../hooks/useAuth'
+import ChatFrame from '../components/chat/ChatFrame'
 import {
   useAIConfig,
   useCcSwitchProviders,
@@ -148,8 +145,6 @@ async function copyText(text) {
 }
 
 export default function Settings() {
-  const { user, logout, isLocalMode } = useAuth()
-  const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const { data: existingConfig, isLoading } = useAIConfig()
   const { data: hermesMonitor, isFetching: isMonitorFetching, refetch: refetchHermes } = useHermesMonitor()
   const { data: hermesSkills = [] } = useHermesSkills()
@@ -350,19 +345,16 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div className="workbench-shell">
-        <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
+      <ChatFrame>
         <main className="page">
           <div className="panel loading-panel">正在加载设置...</div>
         </main>
-      </div>
+      </ChatFrame>
     )
   }
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
-
+    <ChatFrame>
       <main className="page">
         <header className="page-header">
           <div>
@@ -653,7 +645,7 @@ export default function Settings() {
           </aside>
         </div>
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 

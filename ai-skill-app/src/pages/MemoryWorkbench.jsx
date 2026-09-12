@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createAgentMemory, deleteAgentMemory, listAgentMemories, listAgentRuns, updateAgentMemory } from '../api/agents'
-import Sidebar from '../components/workbench/Sidebar'
-import { useAuth } from '../hooks/useAuth'
+import ChatFrame from '../components/chat/ChatFrame'
 
 const EMPTY_FORM = {
   title: '',
@@ -15,7 +14,6 @@ const EMPTY_FORM = {
 
 export default function MemoryWorkbench() {
   const queryClient = useQueryClient()
-  const { user, logout, isLocalMode } = useAuth()
   const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const { data: memories = [] } = useQuery({ queryKey: ['agentMemories'], queryFn: () => listAgentMemories() })
   const [selectedId, setSelectedId] = useState(null)
@@ -30,9 +28,7 @@ export default function MemoryWorkbench() {
   const scopeBreakdown = summarizeScopes(memories)
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
-
+    <ChatFrame>
       <main className="page">
         <header className="page-header">
           <div>
@@ -114,7 +110,7 @@ export default function MemoryWorkbench() {
           </section>
         </div>
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 

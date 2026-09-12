@@ -1,18 +1,11 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 import { deleteFile, listFiles, resolveFileUrl, uploadFiles } from '../api/files'
-import { listConversations } from '../api/projects'
-import ChatSidebar from '../components/chat/ChatSidebar'
-import { useAuth } from '../hooks/useAuth'
-import './chat/ChatShell.css'
+import ChatFrame from '../components/chat/ChatFrame'
 
 export default function FilesWorkbench() {
   const inputRef = useRef(null)
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user, logout, isLocalMode } = useAuth()
-  const { data: conversations = [] } = useQuery({ queryKey: ['conversations'], queryFn: listConversations })
   const { data: files = [] } = useQuery({ queryKey: ['files'], queryFn: listFiles })
   const [selectedFiles, setSelectedFiles] = useState([])
   const [description, setDescription] = useState('')
@@ -62,15 +55,7 @@ export default function FilesWorkbench() {
   }
 
   return (
-    <div className="chat-app">
-      <ChatSidebar
-        conversations={conversations}
-        onNewChat={() => navigate('/')}
-        user={user}
-        onLogout={logout}
-        isLocalMode={isLocalMode}
-      />
-
+    <ChatFrame>
       <main className="files-main">
         <header className="projects-header">
           <div>
@@ -196,7 +181,7 @@ export default function FilesWorkbench() {
           </section>
         </div>
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 

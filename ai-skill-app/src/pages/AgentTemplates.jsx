@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAgentTemplate, listAgentRuns, listAgentTemplates, listAgentTools } from '../api/agents'
-import Sidebar from '../components/workbench/Sidebar'
+import ChatFrame from '../components/chat/ChatFrame'
 import TemplateEditor from '../components/workbench/TemplateEditor'
-import { useAuth } from '../hooks/useAuth'
 
 export default function AgentTemplates() {
-  const { user, logout, isLocalMode } = useAuth()
   const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
   const { data: templates = [] } = useQuery({ queryKey: ['agentTemplates'], queryFn: listAgentTemplates })
   const { data: tools = [] } = useQuery({ queryKey: ['agentTools'], queryFn: listAgentTools })
@@ -24,9 +22,7 @@ export default function AgentTemplates() {
   const restrictedCount = useMemo(() => templates.filter((template) => template.allowed_tools?.length).length, [templates])
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
-
+    <ChatFrame>
       <main className="page">
         <header className="page-header">
           <div>
@@ -92,7 +88,7 @@ export default function AgentTemplates() {
           </section>
         </div>
       </main>
-    </div>
+    </ChatFrame>
   )
 }
 
