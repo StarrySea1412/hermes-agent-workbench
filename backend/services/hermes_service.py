@@ -3,6 +3,7 @@ import logging
 import os
 import socket
 import time
+from types import SimpleNamespace
 from typing import Any, Dict, Iterable, Optional
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -18,6 +19,76 @@ DEFAULT_HERMES_SYSTEM_PROMPT = """You are Hermes Workbench, a practical AI agent
 Help engineers plan tasks, call tools, inspect results, and produce clear final outputs from structured multi-step execution."""
 
 
+def _iter_hermes_stream_events(lines):
+    """解析网关 /v1/chat/completions 的 SSE 行流。
+
+    网关把运行时整轮(含它自己的工具执行)聚合成一个 completion 流：
+    思考/正文以普通 delta 出现，工具生命周期以
+    ``event: hermes.tool.progress``（running/completed）出现——OpenAI SDK
+    会吞掉这种自定义事件，所以必须手工解析。
+
+    产出 ("reasoning"|"answer"|"tool_call"|"tool_result"|"final", payload)。
+    同一次工具调用的两个事件共用同一个 dict：completed 时就地改写状态，
+    上层（chat_service 的 tool_events 列表）持有的引用同步更新。
+    """
+    answer_parts = []
+    records: Dict[str, Dict[str, Any]] = {}
+    current_event = None
+    for raw in lines:
+        line = raw.decode("utf-8", "replace") if isinstance(raw, (bytes, bytearray)) else str(raw)
+        line = line.rstrip("\r\n")
+        if not line or line.startswith(":"):
+            current_event = None
+            continue
+        if line.startswith("event:"):
+            current_event = line[len("event:"):].strip()
+            continue
+        if not line.startswith("data:"):
+            continue
+        data = line[len("data:"):].strip()
+        event_name = current_event
+        current_event = None
+        if data == "[DONE]":
+            break
+        if event_name == "hermes.tool.progress":
+            try:
+                payload = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            call_id = str(payload.get("toolCallId") or "")
+            name = payload.get("tool") or ""
+            if payload.get("status") == "running":
+                record = {"id": call_id or name or "tool", "name": name, "args": {}, "thought": "", "status": "running"}
+                if payload.get("label"):
+                    # label 是运行时对工具参数的摘要,completed 事件不再携带,先存上
+                    record["result_preview"] = payload["label"]
+                if call_id:
+                    records[call_id] = record
+                yield ("tool_call", record)
+            else:
+                record = records.get(call_id) or {"id": call_id or name or "tool", "name": name, "args": {}, "thought": ""}
+                record["status"] = "ok"
+                record["result"] = {"ok": True}
+                yield ("tool_result", record)
+            continue
+        try:
+            chunk = json.loads(data)
+        except json.JSONDecodeError:
+            continue
+        choices = chunk.get("choices") if isinstance(chunk, dict) else None
+        if not choices:
+            continue
+        delta = choices[0].get("delta") or {}
+        reasoning = delta.get("reasoning_content") or delta.get("reasoning")
+        if isinstance(reasoning, str) and reasoning:
+            yield ("reasoning", reasoning)
+        content = delta.get("content")
+        if isinstance(content, str) and content:
+            answer_parts.append(content)
+            yield ("answer", content)
+    yield ("final", SimpleNamespace(content="".join(answer_parts)))
+
+
 class HermesService:
     def __init__(self, config=None, session_id: Optional[str] = None, request_timeout: float = 180.0):
         self.gateway_url = os.getenv("HERMES_GATEWAY_URL", "http://localhost:8642/v1").rstrip("/")
@@ -25,6 +96,7 @@ class HermesService:
             self.gateway_url += "/v1"
         self.gateway_key = os.getenv("HERMES_GATEWAY_KEY", "")
         self.session_id = session_id
+        self.request_timeout = request_timeout
         self.client = OpenAI(
             api_key=self.gateway_key or "hermes",
             base_url=self.gateway_url,
@@ -88,6 +160,47 @@ class HermesService:
             delta = chunk.choices[0].delta.content
             if delta:
                 yield delta
+
+    def stream_chat_with_tools(
+        self,
+        messages,
+        tools=None,
+        system_prompt=None,
+        tool_choice="auto",
+        temperature=0.3,
+        max_tokens=4000,
+        extra_headers=None,
+    ):
+        """流式调用网关并解析 SSE 事件。
+
+        tools 参数有意不转发：工具由运行时用它自己的工具集在网关内部执行，
+        后端只需要从流里读出生命周期事件。产出序列见 _iter_hermes_stream_events。
+        """
+        request_messages = [{"role": "system", "content": system_prompt or DEFAULT_HERMES_SYSTEM_PROMPT}]
+        request_messages.extend(normalize_messages(messages))
+        headers = {
+            "Authorization": f"Bearer {self.gateway_key or 'hermes'}",
+            "Accept": "text/event-stream",
+        }
+        headers.update(self._extra_headers())
+        if extra_headers:
+            headers.update(extra_headers)
+        body = {
+            "model": "hermes-agent",
+            "messages": request_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+
+        import httpx
+
+        # 思考型模型分片间隔可达 180s（运行时 stale-stream 阈值），read 超时放宽
+        read_timeout = max(self.request_timeout, 600.0)
+        with httpx.Client(timeout=httpx.Timeout(self.request_timeout, read=read_timeout)) as http_client:
+            with http_client.stream("POST", f"{self.gateway_url}/chat/completions", json=body, headers=headers) as response:
+                response.raise_for_status()
+                yield from _iter_hermes_stream_events(response.iter_lines())
 
     def analyze_document(self, file_content: str, timeout: int = 180) -> Dict[str, Any]:
         del timeout

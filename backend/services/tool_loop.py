@@ -66,6 +66,9 @@ def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, em
         elif kind == "answer":
             answer_parts.append(payload)
             emit("answer_delta", {"text": payload})
+        elif kind in ("tool_call", "tool_result"):
+            # 网关路径：工具由运行时在远端执行，生命周期事件从流里透传
+            emit(kind, payload)
         elif kind == "final":
             message = payload
     return "".join(reasoning_parts), "".join(answer_parts), message

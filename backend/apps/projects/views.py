@@ -206,10 +206,21 @@ def conversation_stream(request, conversation_id):
     def event_stream():
         reply_parts = []
         interrupted = False
+        # 中断保存路径需要本轮已累计的思考/工具事件：SSE 载荷里的 record dict
+        # 会被后续 tool_result 就地改写，这里只持有引用即可看到最终状态
+        turn_gateway = "hermes"
+        turn_events = []
+        turn_thoughts = []
         try:
             for event, data in service.stream_turn(conversation, content, attachment_ids=attachments):
                 if event == "delta":
                     reply_parts.append(data.get("content", ""))
+                elif event == "status":
+                    turn_gateway = data.get("gateway") or turn_gateway
+                elif event == "tool_call":
+                    turn_events.append(data)
+                elif event == "thought":
+                    turn_thoughts.append(data)
                 if event == "done":
                     reply = data.get("reply", "")
                     metadata = data.get("metadata", {})
@@ -273,9 +284,12 @@ def conversation_stream(request, conversation_id):
                 if partial:
                     try:
                         service.save_assistant_message(conversation, partial, metadata={
-                            "gateway": "hermes",
+                            "gateway": turn_gateway,
                             "interrupted": True,
                             "mode": conversation.mode,
+                            "thoughts": turn_thoughts,
+                            "tool_events": turn_events,
+                            "used_tools": sorted({e.get("name") for e in turn_events if e.get("name")}),
                         })
                     except Exception:
                         logger.exception(

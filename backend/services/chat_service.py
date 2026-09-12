@@ -518,8 +518,12 @@ class ChatService:
             event_queue.put((event_type, payload))
             if event_type == "thought":
                 thoughts.append(payload)
-            elif event_type == "tool_call" and payload not in tool_events:
-                tool_events.append(payload)
+            elif event_type == "tool_call":
+                name = payload.get("name") or ""
+                if name and name not in used_tools:
+                    used_tools.append(name)
+                if payload not in tool_events:
+                    tool_events.append(payload)
             elif event_type == "tool_result" and agent_run is not None:
                 self._record_tool_step(agent_run, payload)
 
