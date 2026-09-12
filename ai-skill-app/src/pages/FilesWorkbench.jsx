@@ -1,15 +1,18 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { listAgentRuns } from '../api/agents'
+import { useNavigate } from 'react-router-dom'
 import { deleteFile, listFiles, resolveFileUrl, uploadFiles } from '../api/files'
-import Sidebar from '../components/workbench/Sidebar'
+import { listConversations } from '../api/projects'
+import ChatSidebar from '../components/chat/ChatSidebar'
 import { useAuth } from '../hooks/useAuth'
+import './chat/ChatShell.css'
 
 export default function FilesWorkbench() {
   const inputRef = useRef(null)
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, logout, isLocalMode } = useAuth()
-  const { data: runs = [] } = useQuery({ queryKey: ['agentRuns'], queryFn: listAgentRuns })
+  const { data: conversations = [] } = useQuery({ queryKey: ['conversations'], queryFn: listConversations })
   const { data: files = [] } = useQuery({ queryKey: ['files'], queryFn: listFiles })
   const [selectedFiles, setSelectedFiles] = useState([])
   const [description, setDescription] = useState('')
@@ -59,59 +62,63 @@ export default function FilesWorkbench() {
   }
 
   return (
-    <div className="workbench-shell">
-      <Sidebar runs={runs} user={user} onLogout={logout} isLocalMode={isLocalMode} />
+    <div className="chat-app">
+      <ChatSidebar
+        conversations={conversations}
+        onNewChat={() => navigate('/')}
+        user={user}
+        onLogout={logout}
+        isLocalMode={isLocalMode}
+      />
 
-      <main className="page">
-        <header className="page-header">
+      <main className="files-main">
+        <header className="projects-header">
           <div>
             <p className="eyebrow">文件</p>
-            <h1>参考文件工作区</h1>
-            <p>文件上传一次即可反复附加到运行中，用 doc_parse 读取，并直接在工作台中打开导出结果。</p>
+            <h1>参考资料库</h1>
+            <p>文件上传一次即可反复附加到会话：doc_parse 负责读取内容，导出结果在工作台直接打开。</p>
           </div>
+          <button type="button" className="primary-button" onClick={() => inputRef.current?.click()}>
+            上传文件
+          </button>
         </header>
 
-        <section className="metric-grid">
-          <MetricCard label="文件数" value={String(files.length)} helper="全部已上传和已生成文件。" />
-          <MetricCard label="可解析" value={String(parseReadyCount)} helper="可由 doc_parse 读取的文件数量。" />
-          <MetricCard label="存储占用" value={formatBytes(totalBytes)} helper="当前工作区文件体积。" />
-          <MetricCard label="最近上传" value={latestUpload} helper="最近加入的参考文件。" />
+        <section className="files-stats" aria-label="文件统计">
+          <div className="files-stat"><span>文件数</span><strong>{files.length}</strong></div>
+          <div className="files-stat"><span>可解析</span><strong>{parseReadyCount}</strong></div>
+          <div className="files-stat"><span>存储占用</span><strong>{formatBytes(totalBytes)}</strong></div>
+          <div className="files-stat"><span>最近上传</span><strong>{latestUpload}</strong></div>
         </section>
 
-        <div className="content-grid two-column">
-          <section className="panel">
+        <div className="files-grid">
+          <section className="files-panel">
             <form className="template-editor" onSubmit={handleSubmit}>
               <div className="panel-header">
-                <div>
-                  <p className="eyebrow">上传</p>
-                  <h2>添加参考资料</h2>
-                </div>
+                <h2>添加参考资料</h2>
+                <small>PDF · Word · 文本 · Markdown</small>
               </div>
 
-              <div className="field">
-                <span>文件</span>
-                <div className="file-picker-row">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => inputRef.current?.click()}
-                  >
-                    选择文件
-                  </button>
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    multiple
-                    accept=".pdf,.docx,.doc,.txt,.md"
-                    className="visually-hidden-input"
-                    onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))}
-                  />
-                  <small className="file-picker-hint">
-                    {selectedFiles.length
-                      ? `已选择 ${selectedFiles.length} 个文件`
-                      : '支持 PDF、Word、文本、Markdown'}
-                  </small>
-                </div>
+              <div className="file-picker-row">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => inputRef.current?.click()}
+                >
+                  选择文件
+                </button>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.docx,.doc,.txt,.md"
+                  className="visually-hidden-input"
+                  onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))}
+                />
+                <small className="file-picker-hint">
+                  {selectedFiles.length
+                    ? `已选择 ${selectedFiles.length} 个文件`
+                    : '上传到共享参考工作区，所有会话可用'}
+                </small>
               </div>
 
               {selectedFiles.length ? (
@@ -120,21 +127,23 @@ export default function FilesWorkbench() {
                     <code key={`${file.name}-${file.size}`}>{file.name}</code>
                   ))}
                 </div>
-              ) : (
-                <div className="empty-inline">请选择一个或多个文件，上传到共享参考工作区。</div>
-              )}
+              ) : null}
 
               <label className="field">
                 <span>说明</span>
                 <textarea
-                  rows={5}
+                  rows={3}
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="可选说明，描述这些文件为什么对后续运行有价值。"
+                  placeholder="可选说明，描述这些文件对后续运行的价值。"
                 />
               </label>
 
-              {notice ? <div className={`panel-alert ${uploadMutation.isError || deleteMutation.isError ? 'error' : ''}`}>{notice}</div> : null}
+              {notice ? (
+                <div className={`panel-notice ${uploadMutation.isError || deleteMutation.isError ? 'error' : ''}`}>
+                  {notice}
+                </div>
+              ) : null}
 
               <div className="editor-actions">
                 <button type="submit" className="primary-button" disabled={uploadMutation.isPending || !selectedFiles.length}>
@@ -144,61 +153,50 @@ export default function FilesWorkbench() {
             </form>
           </section>
 
-          <section className="panel">
+          <section className="files-panel">
             <div className="panel-header">
-              <div>
-                <p className="eyebrow">目录</p>
-                <h2>可用文件</h2>
-              </div>
+              <h2>可用文件</h2>
+              <small>{files.length ? `${files.length} 个文件` : '暂无'}</small>
             </div>
 
-            <div className="file-catalog">
+            <div className="file-list">
               {files.map((file) => (
-                <article key={file.id} className="file-card">
-                  <div className="file-card-top">
-                    <div>
-                      <strong>{file.original_name}</strong>
-                      <small>{formatFileMeta(file)}</small>
-                    </div>
+                <article key={file.id} className="file-item">
+                  <div className="files-file-main">
+                    <strong>{file.original_name}</strong>
+                    <span className="files-file-meta">
+                      {[file.file_type?.toUpperCase() || 'FILE', file.file_size_display || formatBytes(file.file_size || 0), formatDate(file.created_at)]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                    <p className="files-file-desc">{file.description || '暂无说明。'}</p>
                   </div>
-                  <p>{file.description || '暂无说明。'}</p>
-                  <div className="file-card-footer">
-                    <span>{formatDate(file.created_at)}</span>
-                    <div className="editor-actions">
-                      {file.file_url ? (
-                        <a className="artifact-link" href={resolveFileUrl(file.file_url)} target="_blank" rel="noreferrer">
-                          打开
-                        </a>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="secondary-button danger-button"
-                        onClick={() => deleteMutation.mutate(file.id)}
-                        disabled={deleteMutation.isPending && deletingId === file.id}
-                      >
-                        {deleteMutation.isPending && deletingId === file.id ? '删除中...' : '删除'}
-                      </button>
-                    </div>
+                  <div className="files-file-actions">
+                    {file.file_url ? (
+                      <a className="artifact-link" href={resolveFileUrl(file.file_url)} target="_blank" rel="noreferrer">
+                        打开
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="secondary-button danger-button"
+                      onClick={() => deleteMutation.mutate(file.id)}
+                      disabled={deleteMutation.isPending && deletingId === file.id}
+                    >
+                      {deleteMutation.isPending && deletingId === file.id ? '删除中...' : '删除'}
+                    </button>
                   </div>
                 </article>
               ))}
 
-              {!files.length ? <div className="empty-inline">还没有文件。先在这里上传资料，再从运行编排器里附加它们。</div> : null}
+              {!files.length ? (
+                <div className="empty-projects">还没有文件。先上传参考资料，再在会话里用“添加资料”引用它们。</div>
+              ) : null}
             </div>
           </section>
         </div>
       </main>
     </div>
-  )
-}
-
-function MetricCard({ label, value, helper }) {
-  return (
-    <article className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{helper}</small>
-    </article>
   )
 }
 
@@ -210,10 +208,10 @@ function formatBytes(size) {
 }
 
 function formatDate(value) {
-  if (!value) return '未知时间'
+  if (!value) return ''
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString()
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString()
 }
 
 function formatShortDate(value) {
@@ -221,10 +219,4 @@ function formatShortDate(value) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString()
-}
-
-function formatFileMeta(file) {
-  return [file.file_type?.toUpperCase() || 'FILE', file.file_size_display || formatBytes(file.file_size || 0)]
-    .filter(Boolean)
-    .join(' | ')
 }
