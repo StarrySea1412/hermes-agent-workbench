@@ -1,11 +1,12 @@
 """Runtime registry for built-in agent tools."""
 
-from apps.tools.handlers import doc_export, doc_parse, web_search
+from apps.tools.handlers import doc_export, doc_parse, python_sandbox, web_search
 
 TOOL_HANDLERS = {
     "doc_parse": doc_parse.handle,
     "doc_export": doc_export.handle,
     "web_search": web_search.handle,
+    "python_sandbox": python_sandbox.handle,
 }
 
 

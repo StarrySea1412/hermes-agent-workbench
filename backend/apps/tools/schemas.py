@@ -5,6 +5,8 @@ from apps.tools.handlers.doc_export import META as DOC_EXPORT_META
 from apps.tools.handlers.doc_export import SCHEMA as DOC_EXPORT_SCHEMA
 from apps.tools.handlers.doc_parse import META as DOC_PARSE_META
 from apps.tools.handlers.doc_parse import SCHEMA as DOC_PARSE_SCHEMA
+from apps.tools.handlers.python_sandbox import META as PYTHON_SANDBOX_META
+from apps.tools.handlers.python_sandbox import SCHEMA as PYTHON_SANDBOX_SCHEMA
 from apps.tools.handlers.web_search import META as WEB_SEARCH_META
 from apps.tools.handlers.web_search import SCHEMA as WEB_SEARCH_SCHEMA
 
@@ -12,6 +14,7 @@ TOOL_DESCRIPTORS = [
     {"schema": DOC_PARSE_SCHEMA, **DOC_PARSE_META},
     {"schema": DOC_EXPORT_SCHEMA, **DOC_EXPORT_META},
     {"schema": WEB_SEARCH_SCHEMA, **WEB_SEARCH_META},
+    {"schema": PYTHON_SANDBOX_SCHEMA, **PYTHON_SANDBOX_META},
 ]
 
 

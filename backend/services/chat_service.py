@@ -28,6 +28,7 @@ Use tools when they improve correctness:
 - If files are attached, inspect them with doc_parse before making claims.
 - If fresh public information is required, call web_search. Do not claim web results unless the tool succeeded.
 - If the user asks for Excel, XLSX, spreadsheet, CSV-like output, or a table file, call doc_export with format="xlsx".
+- For calculation, data wrangling, quick simulations, or rendering charts, call python_sandbox. Charts: use matplotlib with the Agg backend and save .png files in the working directory.
 - For user-facing file exports, use only provided tools such as doc_export. Do not ask for Python, shell, write_file, or execute_code permissions.
 
 Output style:
@@ -43,9 +44,9 @@ MODE_INSTRUCTIONS = {
 }
 
 MODE_TOOL_NAMES = {
-    "chat": ["doc_parse", "web_search", "doc_export"],
-    "deck": ["doc_parse", "web_search", "doc_export"],
-    "report": ["doc_parse", "web_search", "doc_export"],
+    "chat": ["doc_parse", "web_search", "doc_export", "python_sandbox"],
+    "deck": ["doc_parse", "web_search", "doc_export", "python_sandbox"],
+    "report": ["doc_parse", "web_search", "doc_export", "python_sandbox"],
 }
 
 MAX_HERMES_TURNS = 6
