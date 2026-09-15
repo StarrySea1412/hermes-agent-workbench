@@ -43,7 +43,7 @@ def summarize_tool_result(result):
     return json.dumps(payload, ensure_ascii=False)[:180] if payload is not None else "工具执行完成。"
 
 
-def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, emit, turn_number, max_tokens=None):
+def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, emit, turn_number, max_tokens=None, should_cancel=None):
     """消费中转站流式响应：思考链与正文逐字 emit，返回 (reasoning, answer, message)。"""
     reasoning_parts = []
     answer_parts = []
@@ -60,6 +60,10 @@ def _consume_stream_turn(agent, history, tools, system_prompt, extra_headers, em
     if max_tokens is not None:
         call_kwargs["max_tokens"] = max_tokens
     for kind, payload in agent.stream_chat_with_tools(*call_args, **call_kwargs):
+        # 逐事件检查取消：命中即 break，GeneratorExit 会沿生成器传播关掉
+        # 上游 HTTP 连接，不用等这一轮流完（思考轮可长达 180s+）
+        if should_cancel and should_cancel():
+            break
         if kind == "reasoning":
             reasoning_parts.append(payload)
             emit("thought_delta", {"text": payload, "turn": turn_number})
@@ -132,7 +136,12 @@ def run_tool_loop(
                     emit,
                     turn_index + 1,
                     max_tokens=retry_budget,
+                    should_cancel=should_cancel,
                 )
+                # 流内逐事件取消后立刻收尾：message 可能是半截，不能拿去解析工具调用
+                if should_cancel and should_cancel():
+                    result.exhausted = False
+                    return result
             else:
                 response = agent.chat_with_tools(
                     history,
