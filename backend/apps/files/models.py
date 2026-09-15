@@ -52,3 +52,30 @@ class UploadedFile(models.Model):
         if self.file and os.path.isfile(self.file.path):
             os.remove(self.file.path)
         super().delete(*args, **kwargs)
+
+
+class FileChunk(models.Model):
+    """上传文件的向量分块，聊天检索直接查这张表。"""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='file_chunks',
+    )
+    file = models.ForeignKey(
+        UploadedFile,
+        on_delete=models.CASCADE,
+        related_name='chunks',
+    )
+    file_name = models.CharField(max_length=255)
+    chunk_index = models.PositiveIntegerField()
+    content = models.TextField()
+    embedding = models.BinaryField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'file_chunks'
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['file']),
+        ]

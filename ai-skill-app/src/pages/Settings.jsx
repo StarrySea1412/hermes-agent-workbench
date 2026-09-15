@@ -18,6 +18,7 @@ const DEFAULT_CONFIG = {
   api_key: '',
   base_url: '',
   model_name: '',
+  embedding_model_name: '',
   temperature: 0.7,
   max_tokens: 2000,
 }
@@ -435,6 +436,17 @@ export default function Settings() {
                   }}
                   placeholder={currentProvider.defaultUrl || '输入 API 基础地址'}
                 />
+              </label>
+
+              <label className="field">
+                <span>向量模型（知识库检索）</span>
+                <input
+                  type="text"
+                  value={formData.embedding_model_name || ''}
+                  onChange={(event) => setEdits((prev) => ({ ...prev, embedding_model_name: event.target.value }))}
+                  placeholder="如 text-embedding-3-small；留空则资料检索走本地近似向量"
+                />
+                <small className="inline-hint">上传的资料会用它向量化后供对话自动检索；更换后请到资料页手动重建索引。</small>
               </label>
 
               {remoteModelIds.length ? (

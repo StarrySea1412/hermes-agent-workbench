@@ -62,7 +62,7 @@ def ai_config_view(request):
 
     if "api_key" in data:
         config.api_key_encrypted = get_encryption().encrypt(data["api_key"])
-    for field in ["provider", "base_url", "model_name", "temperature", "max_tokens", "is_active"]:
+    for field in ["provider", "base_url", "model_name", "embedding_model_name", "temperature", "max_tokens", "is_active"]:
         if field in data:
             setattr(config, field, data[field])
 

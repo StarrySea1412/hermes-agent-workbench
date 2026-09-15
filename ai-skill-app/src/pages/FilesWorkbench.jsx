@@ -6,7 +6,13 @@ import ChatFrame from '../components/chat/ChatFrame'
 export default function FilesWorkbench() {
   const inputRef = useRef(null)
   const queryClient = useQueryClient()
-  const { data: files = [] } = useQuery({ queryKey: ['files'], queryFn: listFiles })
+  const { data: files = [] } = useQuery({
+    queryKey: ['files'],
+    queryFn: listFiles,
+    // 有文件还在建索引时轮询，索引完成后自动停
+    refetchInterval: (query) =>
+      (query.state.data || []).some((file) => file.index_status === 'pending') ? 5000 : false,
+  })
   const [selectedFiles, setSelectedFiles] = useState([])
   const [description, setDescription] = useState('')
   const [notice, setNotice] = useState('')
@@ -153,6 +159,9 @@ export default function FilesWorkbench() {
                       {[file.file_type?.toUpperCase() || 'FILE', file.file_size_display || formatBytes(file.file_size || 0), formatDate(file.created_at)]
                         .filter(Boolean)
                         .join(' · ')}
+                    </span>
+                    <span className={`files-file-meta files-index-badge files-index-${file.index_status || 'pending'}`}>
+                      {file.index_status === 'indexed' ? `已入库 · ${file.chunk_count} 块` : '索引中…'}
                     </span>
                     <p className="files-file-desc">{file.description || '暂无说明。'}</p>
                   </div>

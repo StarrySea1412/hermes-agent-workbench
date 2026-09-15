@@ -120,10 +120,26 @@ class ChatService:
         ]
 
     def build_context(self, conversation, attachment_ids=None):
+        """AIService 直连路径的上下文：附件摘要 + 知识库召回片段。"""
         files = self.get_context_files(conversation, attachment_ids=attachment_ids)
-        if not files:
-            return ""
-        return DocumentAnalyzer().summarize_for_context(files)
+        parts = []
+        if files:
+            parts.append(DocumentAnalyzer().summarize_for_context(files))
+        try:
+            from services.rag_service import retrieve_context
+
+            last_user = ""
+            for message in reversed(list(conversation.messages.order_by("created_at"))):
+                if message.role == "user" and message.content:
+                    last_user = message.content
+                    break
+            if last_user:
+                retrieved, _ = retrieve_context(self.user, last_user)
+                if retrieved:
+                    parts.append(retrieved)
+        except Exception:
+            logger.exception("Knowledge retrieval failed in build_context: conversation_id=%s", conversation.id)
+        return "\n\n".join(part for part in parts if part)
 
     def get_context_files(self, conversation, attachment_ids=None):
         files = []
@@ -415,6 +431,26 @@ class ChatService:
         lines.append("Use doc_parse with a file_id when you need the real file contents.")
         return "\n".join(lines)
 
+    def _build_retrieval_prompt(self, conversation, history):
+        """从知识库按本轮问题召回相关片段；任何失败都返回空，不阻断聊天。"""
+        try:
+            from services.rag_service import retrieve_context
+
+            query = ""
+            for message in reversed(history or []):
+                if message.get("role") == "user" and message.get("content"):
+                    query = message["content"]
+                    break
+            if not query:
+                return ""
+            context, count = retrieve_context(self.user, query)
+            if not context:
+                return ""
+            return f"\n\n{context}"
+        except Exception:
+            logger.exception("Knowledge retrieval failed: conversation_id=%s", conversation.id)
+            return ""
+
     def _build_system_prompt(self, conversation, file_prompt="", tools_prompt=""):
         project = conversation.project
         project_note = ""
@@ -505,6 +541,8 @@ class ChatService:
         import threading
 
         file_prompt = self._build_file_prompt(files)
+        # 知识库召回：从已向量化资料里按本轮问题取相关片段；失败静默不阻断聊天
+        retrieval_prompt = self._build_retrieval_prompt(conversation, history)
         extra_headers = {"X-Hermes-Session-Id": session_id} if gateway_label == "compat" and session_id else None
         event_queue: queue.Queue = queue.Queue()
         DONE = object()
@@ -512,7 +550,7 @@ class ChatService:
         def build_system_prompt(native_tools_enabled, tools_prompt_text):
             return self._build_system_prompt(
                 conversation,
-                file_prompt,
+                file_prompt + retrieval_prompt,
                 "" if native_tools_enabled else tools_prompt_text,
             )
 

@@ -8,6 +8,7 @@ class AIConfig(models.Model):
     api_key_encrypted = models.CharField(max_length=512)
     base_url = models.CharField(max_length=256, default='https://api.openai.com/v1')
     model_name = models.CharField(max_length=128, default='gpt-4o-mini')
+    embedding_model_name = models.CharField(max_length=128, blank=True, default='')
     temperature = models.FloatField(default=0.7)
     max_tokens = models.IntegerField(default=2000)
     is_active = models.BooleanField(default=True)

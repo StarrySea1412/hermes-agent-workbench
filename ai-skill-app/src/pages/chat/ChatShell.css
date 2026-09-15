@@ -929,6 +929,32 @@
   font-weight: 500;
 }
 
+.chat-app .files-index-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  border: 1px solid var(--glass-border, rgba(0, 0, 0, 0.08));
+}
+
+.chat-app .files-index-indexed {
+  color: var(--success, #1a7f37);
+  border-color: color-mix(in srgb, var(--success, #1a7f37) 35%, transparent);
+}
+
+.chat-app .files-index-pending {
+  color: var(--muted);
+  animation: files-index-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes files-index-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 .chat-app .files-file-desc {
   margin: 4px 0 0;
   color: var(--muted-strong);
