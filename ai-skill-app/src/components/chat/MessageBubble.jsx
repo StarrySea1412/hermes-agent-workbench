@@ -9,6 +9,7 @@ export default function MessageBubble({ message, pending, isLast = false, onRege
   const { answer, inlineThink } = splitThinkFromContent(message.content)
   const statusMessage = message.metadata?.status_message || ''
   const artifactLinks = collectArtifactLinks(toolEvents)
+  const sandboxArtifacts = collectSandboxArtifacts(toolEvents)
   const thinkingSeconds = message.metadata?.thinking_seconds
   const thinkBodyRef = useRef(null)
   const thinkingActive = pending && !answer
@@ -118,6 +119,30 @@ export default function MessageBubble({ message, pending, isLast = false, onRege
               )
             })}
           </div>
+        ) : null}
+
+        {!isUser && sandboxArtifacts.length ? (
+          <section className="message-artifacts sandbox-gallery" aria-label="沙箱图表">
+            <div className="message-artifacts-head">
+              <span>运行图表</span>
+              <small>{sandboxArtifacts.length} 张</small>
+            </div>
+            <div className="sandbox-gallery-grid">
+              {sandboxArtifacts.map((item) => (
+                <a
+                  key={item.key}
+                  className="sandbox-gallery-item"
+                  href={item.dataUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`${item.name}（点击查看原图）`}
+                >
+                  <img src={item.dataUrl} alt={item.name} loading="lazy" />
+                  <small>{item.name}</small>
+                </a>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         {!isUser && artifactLinks.length ? (
@@ -430,8 +455,31 @@ function parseTableRow(line) {
   return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim())
 }
 
-function collectArtifactLinks(toolEvents) {
-  const links = []
+function collectSandboxArtifacts(toolEvents) {
+  const items = []
+  const seen = new Set()
+
+  toolEvents.forEach((event) => {
+    const artifacts = event?.result?.result?.artifacts
+    if (!Array.isArray(artifacts)) return
+    artifacts.forEach((artifact, index) => {
+      if (!artifact?.data_base64 || !artifact?.media_type) return
+      const key = `${event.id || event.name || 'tool'}-${artifact.filename || index}`
+      if (seen.has(key)) return
+      seen.add(key)
+      items.push({
+        key,
+        name: artifact.filename || `图表 ${index + 1}`,
+        mediaType: artifact.media_type,
+        dataUrl: `data:${artifact.media_type};base64,${artifact.data_base64}`,
+      })
+    })
+  })
+
+  return items
+}
+
+function collectArtifactLinks(toolEvents) {  const links = []
   const seen = new Set()
 
   toolEvents.forEach((event) => {
@@ -472,6 +520,7 @@ function formatToolName(tool) {
     doc_parse: '资料解析',
     web_search: '联网搜索',
     doc_export: '文件导出',
+    python_sandbox: '代码沙箱',
     file_write: '文件写入',
     web_extract: '网页提取',
     terminal: '终端命令',

@@ -25,6 +25,10 @@ export function deleteFile(fileId) {
   return client.delete(`/files/${fileId}`)
 }
 
+export function reindexFile(fileId) {
+  return client.post(`/files/${fileId}/reindex`)
+}
+
 export function resolveFileUrl(url) {
   if (!url) return ''
   if (/^https?:\/\//i.test(url)) return url

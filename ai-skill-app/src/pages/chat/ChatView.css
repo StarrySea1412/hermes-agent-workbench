@@ -985,6 +985,41 @@
   gap: 8px;
 }
 
+.chat-app .sandbox-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.chat-app .sandbox-gallery-item {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--muted);
+  background: var(--glass-surface, transparent);
+}
+
+.chat-app .sandbox-gallery-item img {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  display: block;
+}
+
+.chat-app .sandbox-gallery-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.chat-app .sandbox-gallery-item:hover img {
+  opacity: 0.92;
+}
+
 .chat-app .message-artifacts-head {
   display: flex;
   align-items: center;

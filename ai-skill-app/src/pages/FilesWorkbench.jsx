@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { deleteFile, listFiles, resolveFileUrl, uploadFiles } from '../api/files'
+import { deleteFile, listFiles, reindexFile, resolveFileUrl, uploadFiles } from '../api/files'
 import ChatFrame from '../components/chat/ChatFrame'
 
 export default function FilesWorkbench() {
@@ -17,6 +17,7 @@ export default function FilesWorkbench() {
   const [description, setDescription] = useState('')
   const [notice, setNotice] = useState('')
   const [deletingId, setDeletingId] = useState(null)
+  const [reindexingId, setReindexingId] = useState(null)
 
   const uploadMutation = useMutation({
     mutationFn: ({ items, note }) => uploadFiles(items, note),
@@ -46,6 +47,23 @@ export default function FilesWorkbench() {
     },
     onSettled: () => {
       setDeletingId(null)
+    }
+  })
+
+  const reindexMutation = useMutation({
+    mutationFn: async (fileId) => {
+      setReindexingId(fileId)
+      return reindexFile(fileId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['files'] })
+      setNotice('已重新加入索引队列。')
+    },
+    onError: (error) => {
+      setNotice(error.message || '无法重建索引。')
+    },
+    onSettled: () => {
+      setReindexingId(null)
     }
   })
 
@@ -171,6 +189,14 @@ export default function FilesWorkbench() {
                         打开
                       </a>
                     ) : null}
+                    <button
+                      type="button"
+                      className="artifact-link"
+                      onClick={() => reindexMutation.mutate(file.id)}
+                      disabled={reindexMutation.isPending && reindexingId === file.id}
+                    >
+                      {reindexMutation.isPending && reindexingId === file.id ? '索引中...' : '重建索引'}
+                    </button>
                     <button
                       type="button"
                       className="secondary-button danger-button"

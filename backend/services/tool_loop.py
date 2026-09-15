@@ -34,6 +34,14 @@ def summarize_tool_result(result):
 
     payload = result.get("result")
     if isinstance(payload, dict):
+        if "stdout" in payload:
+            # python_sandbox：预览直接给 stdout，别甩一坨 JSON
+            output = (payload.get("stdout") or "").strip()
+            if output:
+                return output.splitlines()[-1][:180] if len(output.splitlines()) > 3 else output[:180]
+            if payload.get("timed_out"):
+                return "执行超时被终止。"
+            return "执行完成，无输出。"
         if "filename" in payload and "text" in payload:
             return f"已读取 {payload.get('filename')}，返回 {len(payload.get('text') or '')} 个字符。"
         if "results" in payload:
