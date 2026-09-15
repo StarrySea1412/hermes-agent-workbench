@@ -1,12 +1,14 @@
 import json
 import logging
 import os
+import re
 
 from apps.agents.models import AgentRun
 from apps.ai_config.models import AIConfig
 from apps.projects.models import Message
 from apps.tools import registry, schemas
 from services.ai_service import AIService, describe_ai_exception
+from services.chat_cancel import is_chat_cancelled
 from services.document_analyzer import DocumentAnalyzer
 from services.hermes_service import build_session_id, create_hermes_service
 from services.tool_call_parser import parse_tool_calls
@@ -546,6 +548,7 @@ class ChatService:
                     max_turns=MAX_HERMES_TURNS,
                     extra_headers=extra_headers,
                     on_event=on_event,
+                    should_cancel=lambda: is_chat_cancelled(conversation.id),
                 )
                 event_queue.put(("__result__", loop_result))
             except Exception as exc:
@@ -592,9 +595,21 @@ class ChatService:
         if loop_result is None:
             raise RuntimeError("Tool loop finished without a result.")
 
+        # 用户停止：tool_loop 在下一个轮次/工具边界返回空回复，这里按中断处理
+        # 而不是走"空回复"错误路径
+        if is_chat_cancelled(conversation.id):
+            from services.chat_cancel import TurnCancelled
+
+            raise TurnCancelled("已由用户停止本轮生成。")
+
         for name in loop_result.used_tools:
             if name not in used_tools:
                 used_tools.append(name)
+
+        # 网关路径回合后取证：生命周期事件只有工具名+状态，
+        # 真实参数与执行结果在运行时会话历史里，按 call_id 回填
+        if gateway_label == "hermes" and tool_events and getattr(agent, "session_id", None):
+            self._enrich_tool_events(agent, tool_events)
 
         if loop_result.exhausted:
             raise RuntimeError(f"Hermes exhausted {MAX_HERMES_TURNS} turns without a final answer.")
@@ -638,6 +653,35 @@ class ChatService:
         for chunk in chunk_text(reply):
             yield "delta", {"content": chunk}
         yield "done", {"reply": reply, "metadata": metadata}
+
+    def _enrich_tool_events(self, agent, tool_events):
+        """用网关会话历史回填工具事件的真实参数与执行结果（尽力而为）。"""
+        try:
+            trace = agent.fetch_session_tool_trace()
+        except Exception:
+            logger.exception("Tool trace enrichment failed")
+            return
+        if not trace:
+            return
+        for event in tool_events:
+            record = trace.get(event.get("id") or "")
+            if not record:
+                continue
+            if record.get("args"):
+                event["args"] = record["args"]
+            result_content = record.get("result_content")
+            if result_content:
+                # 剥掉运行时包的 <untrusted_tool_result> 声明壳，只留工具原始输出
+                inner = re.search(
+                    r"<untrusted_tool_result[^>]*>([\s\S]*?)</untrusted_tool_result>",
+                    result_content,
+                )
+                if inner:
+                    result_content = inner.group(1)
+                event["result"] = {
+                    "ok": event.get("status") != "error",
+                    "result": str(result_content).strip()[:4000],
+                }
 
     def _record_tool_step(self, agent_run, payload):
         if agent_run is None:

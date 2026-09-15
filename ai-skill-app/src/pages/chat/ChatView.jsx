@@ -2,6 +2,7 @@ import { useRef, useState, useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../../components/Icon'
+import client from '../../api/client'
 import { getHermesMonitor } from '../../api/aiConfig'
 import {
   createConversation,
@@ -425,6 +426,11 @@ export default function ChatView() {
 
   const handleStop = () => {
     abortRef.current?.abort()
+    // 通知后端停止这一轮：流式生成器阻塞在网关读取上，仅断开 fetch
+    // 不会终止上游调用（要等下一个事件才发现断开），白烧 token
+    if (convId) {
+      client.post(`/conversations/${convId}/cancel/`).catch(() => {})
+    }
   }
 
   const handleRegenerate = () => {

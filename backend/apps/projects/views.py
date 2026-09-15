@@ -22,6 +22,7 @@ from apps.projects.serializers import (
 )
 from services.ai_service import describe_ai_exception
 from services.chat_service import ChatService
+from services.chat_cancel import TurnCancelled, clear_chat_cancel, request_chat_cancel
 from services.export_service import generate_project_docx, generate_project_markdown
 
 logger = logging.getLogger("api")
@@ -192,6 +193,23 @@ def conversation_messages(request, conversation_id):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+def conversation_cancel(request, conversation_id):
+    conversation = get_object_or_404(Conversation.objects.filter(user=request.user), id=conversation_id)
+    request_chat_cancel(conversation.id)
+    # 立刻标记运行状态，避免任务页残留"运行中"僵尸
+    from apps.agents.models import AgentRun
+
+    AgentRun.objects.filter(
+        user=request.user,
+        conversation=conversation,
+        source="chat_turn",
+        status__in=["pending", "running"],
+    ).update(status="cancelled", error="已由用户停止")
+    return Response({"ok": True, "message": "已请求停止当前回合。"})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def conversation_stream(request, conversation_id):
     conversation = get_object_or_404(Conversation.objects.filter(user=request.user), id=conversation_id)
     serializer = ChatRequestSerializer(data=request.data)
@@ -202,6 +220,7 @@ def conversation_stream(request, conversation_id):
     attachments = serializer.validated_data.get("attachments", [])
     service.save_user_message(conversation, content, attachment_ids=attachments)
     _refresh_conversation_title(conversation, content)
+    clear_chat_cancel(conversation.id)
 
     def event_stream():
         reply_parts = []
@@ -256,6 +275,10 @@ def conversation_stream(request, conversation_id):
             # 客户端断开（点了停止 / 关闭页面）：标记中断，保留已生成的部分回复
             interrupted = True
             raise
+        except TurnCancelled:
+            # 用户主动停止（cancel API）：按中断处理，保留已生成的轨迹，不当错误
+            interrupted = True
+            raise
         except Exception as exc:
             logger.exception("Conversation stream failed: conversation_id=%s user_id=%s", conversation.id, request.user.id)
             diagnostic = describe_ai_exception(exc)
@@ -264,6 +287,7 @@ def conversation_stream(request, conversation_id):
                 "diagnostic": diagnostic,
             })
         finally:
+            clear_chat_cancel(conversation.id)
             if interrupted:
                 # 中断的聊天轮次：保存半截回复，并把关联运行标记为已取消（避免僵尸“运行中”）
                 try:

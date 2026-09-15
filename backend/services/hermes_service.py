@@ -202,6 +202,52 @@ class HermesService:
                 response.raise_for_status()
                 yield from _iter_hermes_stream_events(response.iter_lines())
 
+    def fetch_session_tool_trace(self, limit: int = 400) -> Dict[str, Dict[str, Any]]:
+        """从网关会话历史取证：call_id → {name, args, result_content}。
+
+        生命周期 SSE 事件只有工具名和状态，参数与真实执行结果只存在
+        运行时会话里（/api/sessions/{id}/messages）。回合结束后查一次，
+        失败静默返回空表——取证是锦上添花，不能影响主流程。
+        """
+        if not self.session_id:
+            return {}
+        try:
+            import httpx
+
+            headers = {"Authorization": f"Bearer {self.gateway_key or 'hermes'}"}
+            url = f"{self.gateway_url.replace('/v1', '')}/api/sessions/{self.session_id}/messages"
+            with httpx.Client(timeout=8.0) as http_client:
+                response = http_client.get(url, params={"limit": limit}, headers=headers)
+                response.raise_for_status()
+                messages = response.json().get("data") or []
+        except Exception as exc:
+            logger.warning("Session tool trace fetch failed (session=%s): %s", self.session_id, exc)
+            return {}
+
+        trace: Dict[str, Dict[str, Any]] = {}
+        for message in messages:
+            role = message.get("role")
+            if role == "assistant":
+                for tool_call in message.get("tool_calls") or []:
+                    fn = tool_call.get("function") or {}
+                    call_id = tool_call.get("id") or tool_call.get("call_id") or ""
+                    if not call_id:
+                        continue
+                    try:
+                        args = json.loads(fn.get("arguments") or "{}")
+                    except json.JSONDecodeError:
+                        args = {"raw": fn.get("arguments") or ""}
+                    record = trace.setdefault(call_id, {})
+                    record["name"] = fn.get("name") or record.get("name") or ""
+                    record["args"] = args if isinstance(args, dict) else {"raw": args}
+            elif role == "tool":
+                call_id = message.get("tool_call_id") or ""
+                if not call_id:
+                    continue
+                record = trace.setdefault(call_id, {})
+                record["result_content"] = message.get("content") or ""
+        return trace
+
     def analyze_document(self, file_content: str, timeout: int = 180) -> Dict[str, Any]:
         del timeout
         prompt = f"""Analyze the following source material for an engineering agent project.

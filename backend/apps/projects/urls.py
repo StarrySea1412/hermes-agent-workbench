@@ -12,4 +12,5 @@ urlpatterns = [
     path("conversations/<int:conversation_id>/", views.conversation_detail, name="conversation-detail"),
     path("conversations/<int:conversation_id>/messages/", views.conversation_messages, name="conversation-messages"),
     path("conversations/<int:conversation_id>/stream/", views.conversation_stream, name="conversation-stream"),
+    path("conversations/<int:conversation_id>/cancel/", views.conversation_cancel, name="conversation-cancel"),
 ]
