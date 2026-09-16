@@ -73,6 +73,28 @@ def prompt_tools_section(allowed_names=None):
     return "\n".join(lines)
 
 
+def render_extra_tools_section(extra_tools):
+    """动态工具（如 MCP）的提示词式描述，格式与 prompt_tools_section 一致。"""
+    lines = []
+    for tool in extra_tools or []:
+        function = tool.get("function") or {}
+        name = function.get("name")
+        if not name:
+            continue
+        params = function.get("parameters") or {}
+        required = set(params.get("required") or [])
+        lines.append(f"- {name}: {function.get('description') or ''}")
+        for param_name, spec in (params.get("properties") or {}).items():
+            requirement = "required" if param_name in required else "optional"
+            spec_type = spec.get("type", "any") if isinstance(spec, dict) else "any"
+            description = spec.get("description", "") if isinstance(spec, dict) else ""
+            lines.append(f"  - {param_name} ({spec_type}, {requirement}): {description}")
+    if not lines:
+        return ""
+    lines.append("")
+    return "\n".join(lines)
+
+
 def tool_catalog(enabled_names=None):
     """Return a UI-friendly list of tools and their registry status."""
     registered = set(registry.list_tool_names())

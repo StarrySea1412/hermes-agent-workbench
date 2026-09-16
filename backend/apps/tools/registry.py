@@ -22,6 +22,14 @@ def execute_tool(name, args, context=None):
     """Execute a registered tool and return a structured result dict."""
     handler = get_handler(name)
     if handler is None:
+        if name.startswith("mcp_"):
+            # MCP 动态工具：按前缀反查用户启用的服务器会话执行
+            from services.mcp_client import call_user_tool
+
+            user = (context or {}).get("user")
+            if user is None:
+                return {"ok": False, "error": f"MCP tool {name} requires an authenticated tool context."}
+            return call_user_tool(user, name, args)
         return {"ok": False, "error": f"Unknown tool: {name}"}
     try:
         return handler(args or {}, context or {})

@@ -95,6 +95,7 @@ def run_tool_loop(
     tool_context: Dict[str, Any],
     max_turns: int = DEFAULT_MAX_TURNS,
     extra_headers: Optional[Dict[str, str]] = None,
+    extra_tools: Optional[List[Dict[str, Any]]] = None,
     on_event: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     should_cancel: Optional[Callable[[], bool]] = None,
 ) -> ToolLoopResult:
@@ -102,11 +103,23 @@ def run_tool_loop(
 
     build_system_prompt(native_tools_enabled, tools_prompt_text) -> system prompt string
     on_event(event_type, payload) is optional; event types: status, thought, tool_call, tool_result
+    extra_tools 是动态来源（如 MCP）的 OpenAI function 定义，名字命中 tool_names 才生效
     """
     allowed = list(tool_names or [])
+    allowed_set = set(allowed)
     native_tools = schemas.openai_tools(allowed)
+    for tool in extra_tools or []:
+        function = tool.get("function") or {}
+        if function.get("name") in allowed_set:
+            native_tools.append(tool)
     tools_prompt_native = bool(native_tools)
     tools_prompt_text = schemas.prompt_tools_section(allowed)
+    extra_prompt = schemas.render_extra_tools_section([
+        tool for tool in (extra_tools or [])
+        if (tool.get("function") or {}).get("name") in allowed_set
+    ])
+    if extra_prompt:
+        tools_prompt_text = f"{tools_prompt_text}\n\n{extra_prompt}".strip() if tools_prompt_text else extra_prompt
     history = list(history)
     result = ToolLoopResult(history=history)
     # 推理型模型可能把输出预算全部花在思考链上（正文为空），

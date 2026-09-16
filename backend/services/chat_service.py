@@ -544,6 +544,17 @@ class ChatService:
         file_prompt = self._build_file_prompt(files)
         # 知识库召回：从已向量化资料里按本轮问题取相关片段；失败静默不阻断聊天
         retrieval_prompt = self._build_retrieval_prompt(conversation, history)
+        # MCP 动态工具（仅本地执行链路）：发现 → 放行名字 → 注入 function 定义
+        extra_tools = []
+        if gateway_label == "compat":
+            try:
+                from services.mcp_client import get_user_mcp_tools, to_openai_tool
+
+                mcp_tools = get_user_mcp_tools(self.user)
+                extra_tools = [to_openai_tool(tool) for tool in mcp_tools]
+                tool_names = list(tool_names) + [tool["prefixed"] for tool in mcp_tools]
+            except Exception:
+                logger.exception("MCP tool collection failed: conversation_id=%s", conversation.id)
         extra_headers = {"X-Hermes-Session-Id": session_id} if gateway_label == "compat" and session_id else None
         event_queue: queue.Queue = queue.Queue()
         DONE = object()
@@ -586,6 +597,7 @@ class ChatService:
                     tool_context=tool_context,
                     max_turns=MAX_HERMES_TURNS,
                     extra_headers=extra_headers,
+                    extra_tools=extra_tools,
                     on_event=on_event,
                     should_cancel=lambda: is_chat_cancelled(conversation.id),
                 )
