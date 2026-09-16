@@ -7,9 +7,12 @@
 """
 from unittest import mock
 
-from django.test import SimpleTestCase
+from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase, TestCase
 
+from apps.projects.models import Conversation
 from services.chat_cancel import (
+    _reset_cache_for_tests,
     clear_chat_cancel,
     is_chat_cancelled,
     request_chat_cancel,
@@ -18,18 +21,32 @@ from services.chat_service import ChatService
 from services.hermes_service import HermesService
 
 
-class ChatCancelRegistryTests(SimpleTestCase):
+class ChatCancelRegistryTests(TestCase):
+    def setUp(self):
+        _reset_cache_for_tests()
+        self.user = get_user_model().objects.create_user(username="cancel-user", password="x")
+        self.conversation = Conversation.objects.create(user=self.user, title="t")
+
+    def tearDown(self):
+        _reset_cache_for_tests()
+
     def test_request_and_clear(self):
-        clear_chat_cancel(9001)
-        self.assertFalse(is_chat_cancelled(9001))
-        request_chat_cancel(9001)
-        self.assertTrue(is_chat_cancelled(9001))
-        clear_chat_cancel(9001)
-        self.assertFalse(is_chat_cancelled(9001))
+        self.assertFalse(is_chat_cancelled(self.conversation.id))
+        request_chat_cancel(self.conversation.id)
+        self.assertTrue(is_chat_cancelled(self.conversation.id))
+        # 标记在 DB 上，跨 worker/进程可见
+        self.conversation.refresh_from_db()
+        self.assertTrue(self.conversation.cancel_requested)
+        clear_chat_cancel(self.conversation.id)
+        self.assertFalse(is_chat_cancelled(self.conversation.id))
+        self.conversation.refresh_from_db()
+        self.assertFalse(self.conversation.cancel_requested)
 
     def test_unknown_conversation_defaults_false(self):
-        clear_chat_cancel(9002)
-        self.assertFalse(is_chat_cancelled(9002))
+        self.assertFalse(is_chat_cancelled(999999))
+
+    def test_request_missing_conversation_returns_false(self):
+        self.assertFalse(request_chat_cancel(999999))
 
 
 def _session_payload():
