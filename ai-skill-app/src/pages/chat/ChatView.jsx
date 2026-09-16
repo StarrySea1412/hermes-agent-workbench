@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useRef, useState, useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../../components/Icon'
@@ -127,14 +127,13 @@ export default function ChatView() {
     }
   })
 
-  // 会话级模型覆盖：空值 = 跟随全局配置；保存后下一轮（含重新生成）即用新模型
-  const [modelDraft, setModelDraft] = useState(null)
+  // 会话级模型覆盖：空值 = 跟随全局配置；保存后下一轮（含重新生成）即用新模型。
+  // 草稿里带 convId，会话切换或远端覆盖变化时旧草稿自动失效，避免 effect 里 setState
+  const [modelDraft, setModelDraft] = useState({ convId: null, value: null })
   const activeModelOverride = conversation?.model_override || ''
-  const shownModel = modelDraft !== null ? modelDraft : activeModelOverride
-  useEffect(() => {
-    // 会话切换或远端覆盖变化时，把本地草稿重置为服务端状态
-    setModelDraft(null)
-  }, [convId, activeModelOverride])
+  const shownModel = modelDraft.convId === convId && modelDraft.value !== null
+    ? modelDraft.value
+    : activeModelOverride
 
   const recentModels = (() => {
     try {
@@ -163,9 +162,9 @@ export default function ChatView() {
   })
 
   const commitModelOverride = () => {
-    if (!convId || modelDraft === null) return
-    const value = modelDraft.trim()
-    setModelDraft(null)
+    if (!convId || modelDraft.convId !== convId || modelDraft.value === null) return
+    const value = modelDraft.value.trim()
+    setModelDraft({ convId: null, value: null })
     if (value === activeModelOverride) return
     if (value) {
       const next = [value, ...recentModels.filter((item) => item !== value)].slice(0, 8)
@@ -560,14 +559,14 @@ export default function ChatView() {
                   value={shownModel}
                   placeholder="模型（留空跟随全局）"
                   spellCheck={false}
-                  onChange={(event) => setModelDraft(event.target.value)}
+                  onChange={(event) => setModelDraft({ convId, value: event.target.value })}
                   onBlur={commitModelOverride}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault()
                       commitModelOverride()
                     }
-                    if (event.key === 'Escape') setModelDraft(null)
+                    if (event.key === 'Escape') setModelDraft({ convId: null, value: null })
                   }}
                 />
                 <datalist id="chat-model-options">
