@@ -260,6 +260,7 @@ def conversation_stream(request, conversation_id):
                                 agent_run_id,
                             )
                     service.sync_project_from_reply(conversation, reply)
+                    _extract_memories_async(request.user.id, conversation.id, content, reply)
                     payload = {
                         "message_id": assistant_message.id,
                         "reply": reply,
@@ -339,6 +340,24 @@ def _refresh_conversation_title(conversation, content):
         conversation.project.title = title
         conversation.project.save(update_fields=["title", "updated_at"])
     conversation.save(update_fields=["title", "updated_at"])
+
+
+def _extract_memories_async(user_id, conversation_id, user_content, reply):
+    """回合完成后后台线程做记忆抽取；失败只记日志。"""
+    import threading
+
+    from django.contrib.auth import get_user_model
+
+    from services.memory_service import extract_and_store_memories
+
+    def _run():
+        try:
+            user = get_user_model().objects.get(id=user_id)
+            extract_and_store_memories(user, conversation_id, user_content, reply)
+        except Exception:
+            logger.exception("Memory extraction thread failed: conversation_id=%s", conversation_id)
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _sse(event, data):

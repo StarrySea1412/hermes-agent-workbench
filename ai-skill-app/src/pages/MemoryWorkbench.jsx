@@ -90,7 +90,7 @@ export default function MemoryWorkbench() {
                   <p>{memory.content}</p>
                   <div className="memory-card-footer">
                     <span>{(memory.tags || []).length ? memory.tags.join(', ') : '无标签'}</span>
-                    <small>{memory.run_id ? `运行 #${memory.run_id}` : '手动创建'}</small>
+                    <small>{memory.metadata?.source === 'auto' ? '对话自动沉淀' : (memory.run_id ? `运行 #${memory.run_id}` : '手动创建')}</small>
                   </div>
                 </button>
               ))}

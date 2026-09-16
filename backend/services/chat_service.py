@@ -453,7 +453,22 @@ class ChatService:
             logger.exception("Knowledge retrieval failed: conversation_id=%s", conversation.id)
             return ""
 
-    def _build_system_prompt(self, conversation, file_prompt="", tools_prompt=""):
+    def _build_memory_prompt(self, conversation, history):
+        """召回跨会话长期记忆；失败返回空不阻断聊天。"""
+        try:
+            from services.memory_service import build_memory_prompt
+
+            query = ""
+            for message in reversed(history or []):
+                if message.get("role") == "user" and message.get("content"):
+                    query = message["content"]
+                    break
+            return build_memory_prompt(self.user, query)
+        except Exception:
+            logger.exception("Memory recall failed: conversation_id=%s", conversation.id)
+            return ""
+
+    def _build_system_prompt(self, conversation, file_prompt="", tools_prompt="", memory_prompt=""):
         project = conversation.project
         project_note = ""
         if project and project.description:
@@ -463,6 +478,7 @@ class ChatService:
             CHAT_SYSTEM_PROMPT,
             MODE_INSTRUCTIONS.get(conversation.mode, MODE_INSTRUCTIONS["chat"]),
             project_note,
+            memory_prompt,
             file_prompt,
             tools_prompt,
         ]
@@ -550,6 +566,8 @@ class ChatService:
         file_prompt = self._build_file_prompt(files)
         # 知识库召回：从已向量化资料里按本轮问题取相关片段；失败静默不阻断聊天
         retrieval_prompt = self._build_retrieval_prompt(conversation, history)
+        # 长期记忆召回：跨会话沉淀的用户事实
+        memory_prompt = self._build_memory_prompt(conversation, history)
         # MCP 动态工具（仅本地执行链路）：发现 → 放行名字 → 注入 function 定义
         extra_tools = []
         if gateway_label == "compat":
@@ -570,6 +588,7 @@ class ChatService:
                 conversation,
                 file_prompt + retrieval_prompt,
                 "" if native_tools_enabled else tools_prompt_text,
+                memory_prompt=memory_prompt,
             )
 
         def on_event(event_type, payload):

@@ -188,7 +188,16 @@ def retrieve_context(user, query, k=TOP_K, char_budget=RESULT_CHAR_BUDGET):
 
     embedder = _get_rag_embedder()
     query_vector = embedder.embed_one(query)
-    matrix = np.stack([np.frombuffer(row.embedding, dtype=np.float32) for row in rows])
+    # 换过 embedding 模型后旧分块维度可能不同：跳过不匹配的行而不是崩掉整次检索
+    pairs = [
+        (row, np.frombuffer(row.embedding, dtype=np.float32))
+        for row in rows
+        if len(row.embedding) == len(query_vector) * 4
+    ]
+    if not pairs:
+        return "", 0
+    rows = [row for row, _ in pairs]
+    matrix = np.stack([vector for _, vector in pairs])
     norms = np.linalg.norm(matrix, axis=1)
     norms[norms == 0] = 1e-12
     scores = (matrix @ query_vector) / (np.linalg.norm(query_vector) or 1e-12) / norms
