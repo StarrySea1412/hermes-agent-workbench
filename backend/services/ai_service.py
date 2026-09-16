@@ -9,6 +9,9 @@ from services.encryption_service import get_encryption
 from services.model_fetch_service import MODEL_FETCH_USER_AGENT, normalize_openai_base_url
 from services.text_utils import normalize_messages
 
+import queue
+import threading
+
 ANTHROPIC_PROVIDERS = {"anthropic"}
 
 DEFAULT_CONTENT_SYSTEM_PROMPT = """You are Hermes Workbench, an AI delivery assistant for structured engineering and knowledge work.
@@ -163,6 +166,12 @@ class AIService:
         text = response.content[0].text if response.content else ""
         return _CompatResponse(text)
 
+    def _first_token_guarded(self, stream):
+        """首 token 看门狗：上游迟迟不吐第一个事件就中止本次尝试（见 stream_guard）。"""
+        from services.stream_guard import first_token_guarded
+
+        return first_token_guarded(stream, settings.AI_FIRST_TOKEN_TIMEOUT)
+
     def stream_chat_with_tools(
         self,
         messages,
@@ -218,7 +227,7 @@ class AIService:
         answer_parts = []
         tool_call_acc = {}
         last_finish = None
-        for chunk in stream:
+        for chunk in self._first_token_guarded(stream):
             if not chunk.choices:
                 continue
             choice = chunk.choices[0]

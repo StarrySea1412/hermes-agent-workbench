@@ -11,6 +11,9 @@ from urllib.request import Request, urlopen
 
 from openai import OpenAI
 
+from django.conf import settings
+
+from services.stream_guard import first_token_guarded
 from services.text_utils import normalize_messages
 
 logger = logging.getLogger(__name__)
@@ -200,7 +203,13 @@ class HermesService:
         with httpx.Client(timeout=httpx.Timeout(self.request_timeout, read=read_timeout)) as http_client:
             with http_client.stream("POST", f"{self.gateway_url}/chat/completions", json=body, headers=headers) as response:
                 response.raise_for_status()
-                yield from _iter_hermes_stream_events(response.iter_lines())
+                # 网关读超时放宽到 600s（思考分片间隔长），但首事件不能等——
+                # 看门狗超时即中止，让降级链（compat→本地保底）接管
+                yield from first_token_guarded(
+                    _iter_hermes_stream_events(response.iter_lines()),
+                    settings.AI_FIRST_TOKEN_TIMEOUT,
+                    label="Hermes 网关",
+                )
 
     def fetch_session_tool_trace(self, limit: int = 400) -> Dict[str, Dict[str, Any]]:
         """从网关会话历史取证：call_id → {name, args, result_content}。

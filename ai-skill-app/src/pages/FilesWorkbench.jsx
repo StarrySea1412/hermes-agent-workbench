@@ -179,7 +179,11 @@ export default function FilesWorkbench() {
                         .join(' · ')}
                     </span>
                     <span className={`files-file-meta files-index-badge files-index-${file.index_status || 'pending'}`}>
-                      {file.index_status === 'indexed' ? `已入库 · ${file.chunk_count} 块` : '索引中…'}
+                      {file.index_status === 'indexed'
+                        ? `已入库 · ${file.chunk_count} 块`
+                        : file.index_status === 'unsupported'
+                          ? '不支持文本提取'
+                          : '索引中…'}
                     </span>
                     <p className="files-file-desc">{file.description || '暂无说明。'}</p>
                   </div>

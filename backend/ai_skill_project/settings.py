@@ -224,6 +224,8 @@ AI_CONFIG_ENCRYPTION_KEY = os.environ.get('AI_CONFIG_ENCRYPTION_KEY', 'change-th
 AI_DEFAULT_TIMEOUT = int(os.environ.get('AI_DEFAULT_TIMEOUT', '60'))
 # 流式请求的读超时：思考型模型在中转站后面可能长时间不吐下一个分片
 AI_STREAM_TIMEOUT = int(os.environ.get('AI_STREAM_TIMEOUT', '240'))
+# 首 token 看门狗：上游建立流后超过该秒数一个事件都没有，直接中止本次尝试去降级
+AI_FIRST_TOKEN_TIMEOUT = int(os.environ.get('AI_FIRST_TOKEN_TIMEOUT', '90'))
 AI_MAX_RETRIES = int(os.environ.get('AI_MAX_RETRIES', '3'))
 AI_DEFAULT_PROVIDER = os.environ.get('AI_DEFAULT_PROVIDER', 'openai')
 AI_DEFAULT_BASE_URL = os.environ.get('AI_DEFAULT_BASE_URL', '')

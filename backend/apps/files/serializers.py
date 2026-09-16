@@ -3,6 +3,9 @@ from rest_framework import serializers
 from apps.files.models import UploadedFile
 from apps.files.validation import validate_uploaded_file
 
+# DocumentAnalyzer 能抽出文本的类型；其余（xlsx 等）建不了索引，别让它们永远显示"索引中"
+EXTRACTABLE_FILE_TYPES = {'pdf', 'md', 'docx', 'doc', 'txt'}
+
 
 class UploadedFileSerializer(serializers.ModelSerializer):
     file_size_display = serializers.ReadOnlyField()
@@ -16,8 +19,11 @@ class UploadedFileSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'original_name', 'file_type', 'file_size', 'created_at']
 
     def get_index_status(self, obj):
-        chunk_count = self._chunk_count(obj)
-        return 'indexed' if chunk_count > 0 else 'pending'
+        if self._chunk_count(obj) > 0:
+            return 'indexed'
+        if obj.file_type not in EXTRACTABLE_FILE_TYPES:
+            return 'unsupported'
+        return 'pending'
 
     def get_chunk_count(self, obj):
         return self._chunk_count(obj)
