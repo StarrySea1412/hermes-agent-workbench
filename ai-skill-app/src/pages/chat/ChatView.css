@@ -850,6 +850,64 @@
   font-weight: 600;
 }
 
+.chat-app .markdown-code-block {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+
+.chat-app .markdown-code-block .markdown-code.in-block {
+  border: none;
+  border-radius: 0;
+}
+
+.chat-app .code-block-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+
+.chat-app .code-block-tabs button {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chat-app .code-block-tabs button.active {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.chat-app .code-block-tab-hint {
+  flex: 1 1 auto;
+  text-align: right;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.chat-app .code-block-copy {
+  color: var(--muted-strong) !important;
+}
+
+.chat-app .artifact-preview-frame {
+  width: 100%;
+  height: 360px;
+  border: none;
+  background: #fff;
+  color-scheme: light;
+}
+
 .chat-app .markdown-table-scroll {
   max-width: 100%;
   overflow: auto;

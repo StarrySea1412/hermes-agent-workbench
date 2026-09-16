@@ -267,8 +267,71 @@ function ToolFileLink({ event }) {
   )
 }
 
-function renderMarkdownLite(content) {
-  const lines = String(content || '').split('\n')
+function isPreviewableHtml(language, code) {
+  const normalized = String(language || '').trim().toLowerCase()
+  if (['html', 'htm'].includes(normalized)) return true
+  // 没标语言的完整 HTML 文档也允许预览（模型常漏写标签）
+  return !normalized && /^\s*(<!doctype html|<html[\s>])/i.test(String(code || ''))
+}
+
+function CodeBlock({ code, language }) {
+  const previewable = isPreviewableHtml(language, code)
+  const [tab, setTab] = useState(previewable ? 'preview' : 'code')
+  const [copied, setCopied] = useState(false)
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  if (!previewable) {
+    return (
+      <pre key="code" className="markdown-code">
+        <code>{code}</code>
+        {language ? <span>{language}</span> : null}
+      </pre>
+    )
+  }
+
+  return (
+    <div className="markdown-code-block" data-language={language || 'html'}>
+      <div className="code-block-tabs">
+        <button type="button" className={tab === 'code' ? 'active' : ''} onClick={() => setTab('code')}>
+          代码
+        </button>
+        <button type="button" className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}>
+          预览
+        </button>
+        <span className="code-block-tab-hint">
+          {tab === 'preview' ? '沙箱运行：无网络、无存储权限' : `${code.split('\n').length} 行`}
+        </span>
+        <button type="button" className="code-block-copy" onClick={copyCode}>
+          {copied ? '已复制' : '复制'}
+        </button>
+      </div>
+      {tab === 'preview' ? (
+        <iframe
+          className="artifact-preview-frame"
+          title="artifact 预览"
+          sandbox="allow-scripts"
+          srcDoc={code}
+        />
+      ) : (
+        <pre className="markdown-code in-block">
+          <code>{code}</code>
+          <span>{language || 'html'}</span>
+        </pre>
+      )}
+    </div>
+  )
+}
+
+function renderMarkdownLite(content) {  const lines = String(content || '').split('\n')
   const blocks = []
   let index = 0
   // 空行打断的列表要合并回同一个列表（助手常在编号项之间留空行）
@@ -305,12 +368,7 @@ function renderMarkdownLite(content) {
         index += 1
       }
       index += 1
-      blocks.push(
-        <pre key={`code-${index}`} className="markdown-code">
-          <code>{codeLines.join('\n')}</code>
-          {language ? <span>{language}</span> : null}
-        </pre>
-      )
+      blocks.push(<CodeBlock key={`code-${index}`} code={codeLines.join('\n')} language={language} />)
       continue
     }
 
