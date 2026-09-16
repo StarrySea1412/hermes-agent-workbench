@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../../components/Icon'
@@ -126,6 +126,53 @@ export default function ChatView() {
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     }
   })
+
+  // 会话级模型覆盖：空值 = 跟随全局配置；保存后下一轮（含重新生成）即用新模型
+  const [modelDraft, setModelDraft] = useState(null)
+  const activeModelOverride = conversation?.model_override || ''
+  const shownModel = modelDraft !== null ? modelDraft : activeModelOverride
+  useEffect(() => {
+    // 会话切换或远端覆盖变化时，把本地草稿重置为服务端状态
+    setModelDraft(null)
+  }, [convId, activeModelOverride])
+
+  const recentModels = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('chatRecentModels') || '[]')
+    } catch {
+      return []
+    }
+  })()
+  const modelOptions = [...new Set([
+    activeModelOverride,
+    aiConfig?.model_name,
+    hermesMonitor?.upstream_model,
+    ...recentModels,
+  ].filter(Boolean))]
+
+  const modelMutation = useMutation({
+    mutationFn: ({ conversationId, modelOverride }) =>
+      updateConversation(conversationId, { model_override: modelOverride }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversation', String(convId)] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+    onError: (error) => {
+      setChatNotice(error.response?.data?.message || error.message || '无法切换模型。')
+    }
+  })
+
+  const commitModelOverride = () => {
+    if (!convId || modelDraft === null) return
+    const value = modelDraft.trim()
+    setModelDraft(null)
+    if (value === activeModelOverride) return
+    if (value) {
+      const next = [value, ...recentModels.filter((item) => item !== value)].slice(0, 8)
+      try { localStorage.setItem('chatRecentModels', JSON.stringify(next)) } catch { /* 忽略 */ }
+    }
+    modelMutation.mutate({ conversationId: convId, modelOverride: value })
+  }
 
   const handlePinChat = (conversationId, isPinned) => {
     pinMutation.mutate({ conversationId, isPinned })
@@ -502,6 +549,32 @@ export default function ChatView() {
             <h1>{conversation?.title || '新任务'}</h1>
           </div>
           <div className="chat-header-actions">
+            {convId ? (
+              <label
+                className="ghost-button chat-model-switcher"
+                title="会话级模型覆盖：留空跟随全局配置，下一轮生效"
+              >
+                <Icon name="spark" size={12} />
+                <input
+                  list="chat-model-options"
+                  value={shownModel}
+                  placeholder="模型（留空跟随全局）"
+                  spellCheck={false}
+                  onChange={(event) => setModelDraft(event.target.value)}
+                  onBlur={commitModelOverride}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      commitModelOverride()
+                    }
+                    if (event.key === 'Escape') setModelDraft(null)
+                  }}
+                />
+                <datalist id="chat-model-options">
+                  {modelOptions.map((model) => <option key={model} value={model} />)}
+                </datalist>
+              </label>
+            ) : null}
             {convId && messages.length ? (
               <button
                 type="button"

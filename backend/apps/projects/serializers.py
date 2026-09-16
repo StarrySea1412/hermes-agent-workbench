@@ -76,6 +76,7 @@ class ConversationSerializer(serializers.ModelSerializer):
             "mode",
             "summary",
             "is_pinned",
+            "model_override",
             "project",
             "project_id",
             "last_message",

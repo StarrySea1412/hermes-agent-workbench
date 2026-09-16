@@ -206,7 +206,7 @@ class ChatService:
         except Exception:
             logger.exception("Failed to create AgentRun for conversation_id=%s", conversation.id)
 
-        compat = self._get_compat_agent()
+        compat = self._get_compat_agent(conversation)
         prefer_compat = compat is not None and os.getenv("CHAT_PREFER_GATEWAY", "").lower() not in ("1", "true", "yes")
         hermes = create_hermes_service(session_id=session_id)
 
@@ -470,16 +470,21 @@ class ChatService:
     def _fallback_or_ai_reply(self, conversation, user_content, attachment_ids=None, allow_ai=True):
         context = self.build_context(conversation, attachment_ids=attachment_ids)
         messages = self.get_history(conversation)
-        config = self._get_config()
+        config = self._get_config(conversation=conversation)
         if not config or not allow_ai:
             return self._fallback_reply(conversation, user_content)
         return AIService(config).generate_content(messages, system_prompt=CHAT_SYSTEM_PROMPT, context=context)
 
-    def _get_config(self):
+    def _get_config(self, conversation=None):
         try:
-            return AIConfig.objects.get(user=self.user, is_active=True)
+            config = AIConfig.objects.get(user=self.user, is_active=True)
         except AIConfig.DoesNotExist:
             return None
+        override = (getattr(conversation, "model_override", "") or "").strip()
+        if override:
+            # 会话级模型覆盖：只换模型名，provider/base_url/密钥沿用全局配置（内存内改写，不落库）
+            config.model_name = override
+        return config
 
     def _get_runtime_model_name(self, agent=None):
         config = self._get_config()
@@ -513,8 +518,8 @@ class ChatService:
 2. 明确你希望的输出形态：结论、方案、README、PRD、设计稿、汇报提纲都可以。
 3. 我会继续按“理解 -> 证据 -> 结构 -> 下一步”的方式推进，而不是停在一次性回答。"""
 
-    def _get_compat_agent(self):
-        config = self._get_config()
+    def _get_compat_agent(self, conversation=None):
+        config = self._get_config(conversation=conversation)
         if not config:
             return None
         try:

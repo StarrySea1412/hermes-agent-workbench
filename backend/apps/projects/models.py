@@ -64,6 +64,8 @@ class Conversation(models.Model):
     mode = models.CharField(max_length=32, choices=MODE_CHOICES, default="chat")
     summary = models.TextField(blank=True, default="")
     is_pinned = models.BooleanField(default=False)
+    # 会话级模型覆盖：非空时 compat 链路用这个模型名（同 provider/base_url），清空回到全局配置
+    model_override = models.CharField(max_length=128, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
