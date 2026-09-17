@@ -121,7 +121,7 @@ class ChatService:
             },
         ]
 
-    def build_context(self, conversation, attachment_ids=None):
+    def build_context(self, conversation, attachment_ids=None, rag_sources=None):
         """AIService 直连路径的上下文：附件摘要 + 知识库召回片段。"""
         files = self.get_context_files(conversation, attachment_ids=attachment_ids)
         parts = []
@@ -136,9 +136,11 @@ class ChatService:
                     last_user = message.content
                     break
             if last_user:
-                retrieved, _ = retrieve_context(self.user, last_user)
+                retrieved, _count, sources = retrieve_context(self.user, last_user)
                 if retrieved:
                     parts.append(retrieved)
+                    if rag_sources is not None:
+                        rag_sources.extend(sources)
         except Exception:
             logger.exception("Knowledge retrieval failed in build_context: conversation_id=%s", conversation.id)
         return "\n\n".join(part for part in parts if part)
@@ -268,7 +270,11 @@ class ChatService:
             except Exception:
                 logger.exception("Failed to mark chat AgentRun failed")
 
-        reply = self._fallback_or_ai_reply(conversation, user_content, attachment_ids=attachment_ids, allow_ai=not compat)
+        rag_sources = []
+        reply = self._fallback_or_ai_reply(
+            conversation, user_content, attachment_ids=attachment_ids,
+            allow_ai=not compat, rag_sources=rag_sources,
+        )
         metadata = {
             **self.extract_delivery_metadata(reply),
             "gateway": "fallback",
@@ -281,6 +287,8 @@ class ChatService:
             "file_count": len(files),
             "agent_run_id": getattr(agent_run, "id", None),
         }
+        if rag_sources:
+            metadata["rag_sources"] = rag_sources
         for chunk in chunk_text(reply):
             yield "delta", {"content": chunk}
         yield "done", {"reply": reply, "metadata": metadata}
@@ -434,7 +442,7 @@ class ChatService:
         return "\n".join(lines)
 
     def _build_retrieval_prompt(self, conversation, history):
-        """从知识库按本轮问题召回相关片段；任何失败都返回空，不阻断聊天。"""
+        """从知识库按本轮问题召回相关片段；任何失败都返回 (空, [])，不阻断聊天。"""
         try:
             from services.rag_service import retrieve_context
 
@@ -444,14 +452,14 @@ class ChatService:
                     query = message["content"]
                     break
             if not query:
-                return ""
-            context, count = retrieve_context(self.user, query)
+                return "", []
+            context, _count, sources = retrieve_context(self.user, query)
             if not context:
-                return ""
-            return f"\n\n{context}"
+                return "", []
+            return f"\n\n{context}", sources
         except Exception:
             logger.exception("Knowledge retrieval failed: conversation_id=%s", conversation.id)
-            return ""
+            return "", []
 
     def _build_memory_prompt(self, conversation, history):
         """召回跨会话长期记忆；失败返回空不阻断聊天。"""
@@ -484,12 +492,12 @@ class ChatService:
         ]
         return "\n\n".join(section for section in sections if section).strip()
 
-    def _fallback_or_ai_reply(self, conversation, user_content, attachment_ids=None, allow_ai=True):
-        context = self.build_context(conversation, attachment_ids=attachment_ids)
-        messages = self.get_history(conversation)
+    def _fallback_or_ai_reply(self, conversation, user_content, attachment_ids=None, allow_ai=True, rag_sources=None):
         config = self._get_config(conversation=conversation)
         if not config or not allow_ai:
             return self._fallback_reply(conversation, user_content)
+        context = self.build_context(conversation, attachment_ids=attachment_ids, rag_sources=rag_sources)
+        messages = self.get_history(conversation)
         return AIService(config).generate_content(messages, system_prompt=CHAT_SYSTEM_PROMPT, context=context)
 
     def _get_config(self, conversation=None):
@@ -565,7 +573,7 @@ class ChatService:
 
         file_prompt = self._build_file_prompt(files)
         # 知识库召回：从已向量化资料里按本轮问题取相关片段；失败静默不阻断聊天
-        retrieval_prompt = self._build_retrieval_prompt(conversation, history)
+        retrieval_prompt, rag_sources = self._build_retrieval_prompt(conversation, history)
         # 长期记忆召回：跨会话沉淀的用户事实
         memory_prompt = self._build_memory_prompt(conversation, history)
         # MCP 动态工具（仅本地执行链路）：发现 → 放行名字 → 注入 function 定义
@@ -582,6 +590,13 @@ class ChatService:
         extra_headers = {"X-Hermes-Session-Id": session_id} if gateway_label == "compat" and session_id else None
         event_queue: queue.Queue = queue.Queue()
         DONE = object()
+
+        if rag_sources:
+            chunk_total = sum(source["chunks"] for source in rag_sources)
+            yield "status", {
+                "stage": "rag_recall",
+                "message": f"知识库召回 {chunk_total} 条相关片段（{'、'.join(source['file'] for source in rag_sources)}）",
+            }
 
         def build_system_prompt(native_tools_enabled, tools_prompt_text):
             return self._build_system_prompt(
@@ -726,6 +741,8 @@ class ChatService:
             "file_count": len(files),
             "agent_run_id": getattr(agent_run, "id", None),
         }
+        if rag_sources:
+            metadata["rag_sources"] = rag_sources
         for chunk in chunk_text(reply):
             yield "delta", {"content": chunk}
         yield "done", {"reply": reply, "metadata": metadata}

@@ -9,8 +9,11 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
+import re
 
 import numpy as np
+
+from django.db import transaction
 
 from apps.files.models import FileChunk
 from services.ai_service import AIService
@@ -24,22 +27,23 @@ QUERY_CHAR_BUDGET = 500
 TOP_K = 6
 RESULT_CHAR_BUDGET = 2600
 
-_rag_embedder = None
+# BinaryField 内的版本化封装：magic + 模型指纹 + float32 向量，无需 schema 迁移。
+# 无此前缀的历史向量无法证明模型兼容，只允许词法召回。
+_EMBED_MAGIC = b"RAG\x01"
 
 
-def _get_rag_embedder():
-    global _rag_embedder
-    if _rag_embedder is None:
-        _rag_embedder = RagEmbedder()
-    return _rag_embedder
+def _get_rag_embedder(user):
+    return RagEmbedder(user)
 
 
 class RagEmbedder:
-    """单例 embedding 提供方：配置可用走 API，否则本地哈希向量。"""
+    """每次操作按当前用户取配置；哈希只表示词法信号，不是语义 embedding。"""
 
-    def __init__(self):
+    def __init__(self, user):
+        self.user = user
         self.mode = "hash"
         self.embedding_model = ""
+        self.model_fingerprint = None
         self._ai_service = None
         self._ready = False
 
@@ -50,23 +54,23 @@ class RagEmbedder:
         try:
             from apps.ai_config.models import AIConfig
 
-            config = AIConfig.objects.filter(is_active=True).first()
-        except Exception:
-            config = None
-        if not config or getattr(config, "provider", "") == "anthropic":
-            return
-        self._ai_service = AIService(config)
-        self.embedding_model = getattr(config, "embedding_model_name", "") or ""
-        if self.embedding_model:
+            config = AIConfig.objects.filter(user=self.user, is_active=True).first()
+            if not config or config.provider == "anthropic" or not config.embedding_model_name.strip():
+                return
+            self._ai_service = AIService(config)
+            self.embedding_model = config.embedding_model_name.strip()
+            identity = "\n".join((
+                str(self.user.pk), config.provider,
+                (config.base_url or "").strip().rstrip("/"), self.embedding_model,
+            ))
+            self.model_fingerprint = hashlib.sha256(identity.encode("utf-8")).digest()
             self.mode = "api"
+        except Exception:
+            logger.exception("Embedding configuration unavailable for user_id=%s", self.user.pk)
 
     def is_api_ready(self):
         self._ensure_ready()
         return self.mode == "api"
-
-    def dim(self):
-        self._ensure_ready()
-        return len(self.embed_one("维度探测"))
 
     def embed_one(self, text):
         return self.embed_many([text])[0]
@@ -77,7 +81,10 @@ class RagEmbedder:
             try:
                 return self._api_embed(texts)
             except Exception as exc:
-                logger.warning("Embeddings API failed (%s), falling back to local hash vectors", exc)
+                logger.warning("Embeddings API failed (%s), falling back to lexical hash vectors", exc)
+                # 不能把失败后的哈希向量标为此 API 模型的语义向量。
+                self.mode = "hash"
+                self.model_fingerprint = None
         return [_hash_embed(text, EMBED_DIM) for text in texts]
 
     def _api_embed(self, texts):
@@ -88,8 +95,22 @@ class RagEmbedder:
                 model=self.embedding_model,
                 input=batch,
             )
-            vectors.extend(np.asarray(item.embedding, dtype=np.float32) for item in response.data)
+            items = sorted(response.data, key=lambda item: item.index)
+            if [item.index for item in items] != list(range(len(batch))):
+                raise ValueError("Embedding response indices/count do not match input")
+            vectors.extend(np.asarray(item.embedding, dtype=np.float32) for item in items)
+        if vectors and any(
+            vector.ndim != 1 or not vector.size or vector.shape != vectors[0].shape
+            or not np.all(np.isfinite(vector)) or not np.linalg.norm(vector)
+            for vector in vectors
+        ):
+            raise ValueError("Embedding response contains invalid vectors")
         return vectors
+
+
+def _encode_embedding(vector, fingerprint):
+    payload = np.asarray(vector, dtype=np.float32).tobytes()
+    return _EMBED_MAGIC + fingerprint + payload if fingerprint else payload
 
 
 def _tokenize(text):
@@ -119,45 +140,75 @@ def _hash_embed(text, dim):
 
 
 def chunk_text_for_index(text, target=900, overlap=160):
-    """按行切分带重叠的文本块，尽量不切在句子中间。"""
+    """标题是硬章节边界；章内优先按行、长单行按字符切分，严格限制块长。"""
+    if target <= 0 or not 0 <= overlap < target:
+        raise ValueError("Require target > 0 and 0 <= overlap < target")
     text = (text or "").replace("\r\n", "\n").strip()
     if not text:
         return []
     lines = [line.strip() for line in text.split("\n") if line.strip()]
-    chunks = []
-    current = ""
+
+    sections = []
+    current_section = []
     for line in lines:
-        if current and len(current) + len(line) > target:
-            chunks.append(current)
-            current = (current[-overlap:] + "\n" + line) if overlap else line
+        if re.match(r"^#{1,6}\s", line) and current_section:
+            sections.append(current_section)
+            current_section = [line]
         else:
-            current = f"{current}\n{line}" if current else line
-    if current:
-        chunks.append(current)
+            current_section.append(line)
+    if current_section:
+        sections.append(current_section)
+
+    chunks = []
+    for section in sections:
+        section_text = "\n".join(section)
+        start = 0
+        while start < len(section_text):
+            end = min(start + target, len(section_text))
+            if end < len(section_text):
+                boundary = section_text.rfind("\n", start, end + 1)
+                # 不把章首标题单独切走；短边界也不值得牺牲块容量。
+                heading_end = len(section[0]) if start == 0 and re.match(r"^#{1,6}\s", section[0]) else -1
+                if boundary > max(start + overlap, start + target // 2, heading_end):
+                    end = boundary
+            chunk = section_text[start:end].strip()
+            if chunk:
+                chunks.append(chunk)
+            if end == len(section_text):
+                break
+            start = end - overlap
     return chunks
 
 
 def index_uploaded_file(uploaded):
-    """把上传文件抽文本、分块、向量化并落库；返回是否成功索引。"""
-    FileChunk.objects.filter(file=uploaded).delete()
+    """把上传文件抽文本、分块、向量化并落库；返回是否成功索引。
+
+    先算好再事务性替换分块：抽取或向量化失败时保留旧索引。
+    """
     text = _extract_index_text(uploaded)
     chunks = chunk_text_for_index(text[:MAX_INDEX_CHARS])
     if not chunks:
         return False
 
-    embedder = _get_rag_embedder()
+    embedder = _get_rag_embedder(uploaded.user)
     vectors = embedder.embed_many(chunks)
-    FileChunk.objects.bulk_create([
+    if len(vectors) != len(chunks):
+        raise ValueError("Embedding count does not match chunks")
+    fingerprint = embedder.model_fingerprint
+    new_chunks = [
         FileChunk(
             file=uploaded,
             user=uploaded.user,
             file_name=uploaded.original_name,
             chunk_index=index,
             content=chunk,
-            embedding=np.asarray(vector, dtype=np.float32).tobytes(),
+            embedding=_encode_embedding(vector, fingerprint),
         )
         for index, (chunk, vector) in enumerate(zip(chunks, vectors))
-    ])
+    ]
+    with transaction.atomic():
+        FileChunk.objects.filter(file=uploaded).delete()
+        FileChunk.objects.bulk_create(new_chunks)
     return True
 
 
@@ -178,63 +229,87 @@ def delete_file_chunks(file_id):
 
 
 def retrieve_context(user, query, k=TOP_K, char_budget=RESULT_CHAR_BUDGET):
-    """按查询向量召回相关块，返回 (注入的上下文字符串, 命中块数)。"""
+    """模型指纹一致的语义分 + 本地词法哈希分；历史未知模型仅用词法。
+
+    返回 (注入文本, 命中块数, 来源列表[{file_id, file, chunks}])。
+    file 是展示名，同名文件附加 ID 消歧。
+    """
     query = (query or "").strip()[:QUERY_CHAR_BUDGET]
-    if not query:
-        return "", 0
-    rows = list(FileChunk.objects.filter(user=user).only("file_name", "content", "embedding"))
+    if not query or k <= 0 or char_budget <= 0:
+        return "", 0, []
+    rows = list(FileChunk.objects.filter(user=user, file__user=user).only(
+        "file_id", "file_name", "content", "embedding",
+    ).order_by("file_id", "chunk_index", "id"))
     if not rows:
-        return "", 0
+        return "", 0, []
 
-    embedder = _get_rag_embedder()
+    embedder = _get_rag_embedder(user)
     query_vector = embedder.embed_one(query)
-    # 换过 embedding 模型后旧分块维度可能不同：跳过不匹配的行而不是崩掉整次检索
-    pairs = [
-        (row, np.frombuffer(row.embedding, dtype=np.float32))
-        for row in rows
-        if len(row.embedding) == len(query_vector) * 4
-    ]
-    if not pairs:
-        return "", 0
-    rows = [row for row, _ in pairs]
-    matrix = np.stack([vector for _, vector in pairs])
-    norms = np.linalg.norm(matrix, axis=1)
-    norms[norms == 0] = 1e-12
-    scores = (matrix @ query_vector) / (np.linalg.norm(query_vector) or 1e-12) / norms
+    lexical_query = _hash_embed(query, EMBED_DIM)
 
-    top_indices = np.argsort(scores)[::-1][: max(k * 2, k)]
+    names = {}
+    for row in rows:
+        names.setdefault(row.file_name, set()).add(row.file_id)
+    labels = {
+        row.file_id: (f"{row.file_name} (file_id={row.file_id})"
+                      if len(names[row.file_name]) > 1 else row.file_name)
+        for row in rows
+    }
+    candidates = []
+    for row in rows:
+        lexical = max(float(_hash_embed(row.content, EMBED_DIM) @ lexical_query), 0.0)
+        semantic, available = _stored_semantic_score(row, query_vector, embedder.model_fingerprint)
+        score = 0.65 * max(semantic, 0.0) + 0.35 * lexical if available else lexical
+        # 阈值跟随实际评分方式，而不是“配置了 API”。
+        if score >= (0.15 if available else 0.08):
+            candidates.append((score, row))
+    candidates.sort(key=lambda pair: -pair[0])
+
     picked = []
     used_chars = 0
-    per_file = {}
-    for index in top_indices:
-        row = rows[int(index)]
-        score = float(scores[int(index)])
-        # 哈希向量分数天然偏低，阈值只拦“明显无关”
-        threshold = 0.2 if embedder.is_api_ready() else 0.06
-        if score < threshold:
+    sources = {}
+    for score, row in candidates:
+        if sources.get(row.file_id, 0) >= 2:
             continue
-        if per_file.get(row.file_name, 0) >= 2:
+        snippet = row.content[:max(0, char_budget - used_chars)].strip()
+        if not snippet:
             continue
-        snippet = row.content
-        if used_chars + len(snippet) > char_budget:
-            snippet = snippet[: max(0, char_budget - used_chars)].strip()
-            if not snippet:
-                break
         picked.append((row, snippet))
         used_chars += len(snippet)
-        per_file[row.file_name] = per_file.get(row.file_name, 0) + 1
+        sources[row.file_id] = sources.get(row.file_id, 0) + 1
         if len(picked) >= k or used_chars >= char_budget:
             break
 
     if not picked:
-        return "", 0
+        return "", 0, []
 
     lines = [
-        "以下是与用户问题相关的已上传资料片段（来自你的知识库，可直接引用并注明文件名）：",
+        "以下是与用户问题相关的已上传资料片段（来自你的知识库，可直接引用并注明来源）：",
         "",
     ]
     for row, snippet in picked:
-        lines.append(f"[来源: {row.file_name}]")
+        lines.append(f"[来源: {labels[row.file_id]}]")
         lines.append(snippet)
         lines.append("")
-    return "\n".join(lines).strip(), len(picked)
+    context = "\n".join(lines).strip()
+    source_list = [
+        {"file_id": file_id, "file": labels[file_id], "chunks": count}
+        for file_id, count in sources.items()
+    ]
+    return context, len(picked), source_list
+
+
+def _stored_semantic_score(row, query_vector, fingerprint=None):
+    """只有带当前用户/端点/模型指纹的向量可作语义评分，裸历史向量不可信。"""
+    if not fingerprint:
+        return 0.0, False
+    payload = bytes(row.embedding)
+    prefix = _EMBED_MAGIC + fingerprint
+    if not payload.startswith(prefix) or len(payload) != len(prefix) + len(query_vector) * 4:
+        return 0.0, False
+    vector = np.frombuffer(payload[len(prefix):], dtype=np.float32)
+    norm = float(np.linalg.norm(vector) * np.linalg.norm(query_vector))
+    if not norm or not math.isfinite(norm):
+        return 0.0, False
+    score = float(vector @ query_vector / norm)
+    return (score, True) if math.isfinite(score) else (0.0, False)

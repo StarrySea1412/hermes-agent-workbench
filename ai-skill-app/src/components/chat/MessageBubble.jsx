@@ -10,6 +10,7 @@ export default function MessageBubble({ message, pending, isLast = false, onRege
   const statusMessage = message.metadata?.status_message || ''
   const artifactLinks = collectArtifactLinks(toolEvents)
   const sandboxArtifacts = collectSandboxArtifacts(toolEvents)
+  const ragSources = !isUser && Array.isArray(message.metadata?.rag_sources) ? message.metadata.rag_sources : []
   const thinkingSeconds = message.metadata?.thinking_seconds
   const thinkBodyRef = useRef(null)
   const thinkingActive = pending && !answer
@@ -172,6 +173,17 @@ export default function MessageBubble({ message, pending, isLast = false, onRege
             : <span className="typing-dot">{pending ? '正在生成...' : '没有收到可显示的回复，请重试或检查模型连接。'}</span>}
           {pending && answer ? <span className="type-caret" /> : null}
         </div>
+
+        {!isUser && !pending && ragSources.length ? (
+          <div className="rag-sources" aria-label="参考来源">
+            <small>参考来源</small>
+            {ragSources.map((source) => (
+              <span key={source.file} className="rag-source-chip" title={`召回 ${source.chunks} 条片段`}>
+                {source.file}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         {!isUser && !pending && answer ? (
           <div className="message-actions">

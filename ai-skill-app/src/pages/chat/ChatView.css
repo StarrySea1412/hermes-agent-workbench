@@ -1105,6 +1105,33 @@
   opacity: 0.92;
 }
 
+.chat-app .rag-sources {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.chat-app .rag-sources small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.chat-app .rag-source-chip {
+  padding: 2px 9px;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 999px;
+  color: var(--muted-strong);
+  background: var(--glass-surface, transparent);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
 .chat-app .message-artifacts-head {
   display: flex;
   align-items: center;
