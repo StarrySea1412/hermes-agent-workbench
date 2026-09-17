@@ -118,6 +118,7 @@ export async function streamMessage(conversationId, data, handlers = {}, options
       if (parsed.event === 'answer_delta') handlers.onAnswerDelta?.(parsed.data)
       if (parsed.event === 'tool_call') handlers.onToolCall?.(parsed.data)
       if (parsed.event === 'tool_result') handlers.onToolResult?.(parsed.data)
+      if (parsed.event === 'tool_approval') handlers.onToolApproval?.(parsed.data)
       if (parsed.event === 'delta') handlers.onDelta?.(parsed.data.content || '')
       if (parsed.event === 'done') handlers.onDone?.(parsed.data)
       if (parsed.event === 'error') handlers.onError?.(parsed.data)

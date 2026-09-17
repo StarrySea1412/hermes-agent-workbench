@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import Icon from '../../components/Icon'
 import client from '../../api/client'
+import ToolApprovalPanel from '../../components/chat/ToolApprovalPanel'
+import { toolExecutionsKey } from '../../api/toolExecutions'
 import { getHermesMonitor } from '../../api/aiConfig'
 import {
   createConversation,
@@ -33,6 +35,8 @@ import {
 } from './chatDraftStore'
 import './ChatShell.css'
 import './ChatView.css'
+
+import './ToolApproval.css'
 
 function useChatDraft() {
   return useSyncExternalStore(subscribeChatDraft, getChatDraftSnapshot, getChatDraftSnapshot)
@@ -73,6 +77,35 @@ export default function ChatView() {
     enabled: Boolean(convId),
     retry: false
   })
+
+  const [newApprovalRequired, setNewApprovalRequired] = useState(false)
+  const approvalLock = useRef(false)
+  const approvalRequired = convId ? conversation?.tool_approval_required === true : newApprovalRequired
+  const approvalMutation = useMutation({
+    mutationFn: ({ conversationId, required }) =>
+      updateConversation(conversationId, { tool_approval_required: required }),
+    onSuccess: (updated, { conversationId, required }) => {
+      queryClient.setQueryData(['conversation', String(conversationId)], (current) => ({
+        ...current,
+        ...updated,
+        tool_approval_required: updated?.tool_approval_required ?? required,
+      }))
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+    onSettled: () => { approvalLock.current = false },
+  })
+  const approvalBusy = approvalMutation.isPending
+  const approvalError = approvalMutation.isError && String(approvalMutation.variables?.conversationId) === String(convId)
+    ? approvalMutation.error.message : ''
+  const changeApproval = (required) => {
+    if (isSending || approvalLock.current || createMutation.isPending || (convId && !conversation)) return
+    if (!convId) {
+      setNewApprovalRequired(required)
+      return
+    }
+    approvalLock.current = true
+    approvalMutation.mutate({ conversationId: convId, required })
+  }
 
   const messages = draft?.conversationId === String(convId)
     ? draft.messages
@@ -242,12 +275,15 @@ export default function ChatView() {
 
     try {
       let targetConvId = convId
-      if (!targetConvId || !conversation) {
+        if (!targetConvId || !conversation) {
         const created = await createConversation({
           title: content.slice(0, 40) || '新对话',
           mode: 'chat',
-          description: content.slice(0, 120)
+          description: content.slice(0, 120),
+          // 无会话页面上选好的受控执行偏好：创建时一并生效，避免丢选择
+          tool_approval_required: newApprovalRequired || undefined,
         })
+        setNewApprovalRequired(false)
         targetConvId = created.id
         setChatDraft({ conversationId: String(created.id), messages: initialMessages })
         queryClient.invalidateQueries({ queryKey: ['conversations'] })
@@ -281,6 +317,9 @@ export default function ChatView() {
           })
           if (status.message) {
             setChatNotice(buildRuntimeNotice(status))
+          }
+          if (status.tool_approval) {
+            queryClient.invalidateQueries({ queryKey: toolExecutionsKey(targetConvId) })
           }
         },
         onThought: (thought) => {
@@ -384,6 +423,9 @@ export default function ChatView() {
             }
           })
         },
+        onToolApproval: () => {
+          queryClient.invalidateQueries({ queryKey: toolExecutionsKey(targetConvId) })
+        },
         onDelta: (delta) => {
           setChatDraft((current) => {
             const currentMessages = current?.messages || initialMessages
@@ -419,6 +461,7 @@ export default function ChatView() {
           setChatNotice('')
           queryClient.invalidateQueries({ queryKey: ['conversation', String(targetConvId)] })
           queryClient.invalidateQueries({ queryKey: ['conversations'] })
+          queryClient.invalidateQueries({ queryKey: toolExecutionsKey(targetConvId) })
         },
         onError: (payload) => {
           const errorNotice = buildChatErrorNotice(payload)
@@ -611,8 +654,27 @@ export default function ChatView() {
           </div>
         </header>
 
+        <div className="tool-approval-setting">
+          <label className="tool-approval-toggle">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={approvalRequired}
+              disabled={isSending || approvalBusy || createMutation.isPending || Boolean(convId && !conversation)}
+              onChange={(event) => changeApproval(event.target.checked)}
+              aria-describedby="tool-approval-description"
+            />
+            <strong>受控执行{approvalBusy ? ' · 保存中…' : approvalRequired ? ' · 已开启' : ' · 已关闭'}</strong>
+          </label>
+          <p id="tool-approval-description">
+            {approvalRequired
+              ? '开启后 Python 需逐次审批；暂不支持 Hermes / MCP，需先配置本地模型。'
+              : '关闭为旧模式，无逐次审批。开启可逐次审批 Python（暂不支持 Hermes / MCP，需本地模型配置）。'}
+          </p>
+          {approvalError ? <p className="tool-approval-error" role="alert">保存失败：{approvalError}</p> : null}
+        </div>
         <div className="chat-workspace">
-          <section className={`chat-thread ${messages.length ? '' : 'empty'}`}>
+          <section className={`chat-thread approval-thread ${messages.length ? '' : 'empty'}`}>
             <details className="mobile-runtime-panel">
               <summary>
                 <span>{runtime.gatewayLabel}</span>
@@ -647,6 +709,8 @@ export default function ChatView() {
                 />
               </EmptyChatHero>
             ) : null}
+
+            {convId ? <ToolApprovalPanel key={String(convId)} conversationId={convId} /> : null}
 
             {notice ? (
               <ChatNotice

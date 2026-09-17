@@ -1,0 +1,239 @@
+/* 受控执行（tool_approval_required）开关与审批面板：复用聊天玻璃变量 */
+
+.tool-approval-setting {
+  display: grid;
+  gap: 4px;
+  margin: 0 auto;
+  padding: 8px clamp(16px, 3vw, 36px) 6px;
+  max-width: 860px;
+  width: 100%;
+}
+
+.chat-app .tool-approval-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.chat-app .tool-approval-toggle input[type='checkbox'] {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.chat-app .tool-approval-toggle input[type='checkbox']::after {
+  content: '';
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: 2px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.chat-app .tool-approval-toggle input[type='checkbox']:checked {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+.chat-app .tool-approval-toggle input[type='checkbox']:checked::after {
+  transform: translateX(12px);
+  background: var(--success);
+}
+
+.chat-app .tool-approval-toggle input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.chat-app .tool-approval-toggle input[type='checkbox']:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.tool-approval-setting p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.chat-app .chat-thread.approval-thread {
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
+}
+
+/* 审批面板：置于消息区内，玻璃卡片风格 */
+.tool-approval-panel {
+  display: grid;
+  gap: 10px;
+  margin: 0 auto;
+  padding: 0 clamp(16px, 3vw, 36px);
+  max-width: 860px;
+  width: 100%;
+}
+
+.tool-approval-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tool-approval-heading strong {
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-approval-heading span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.tool-approval-empty,
+.tool-approval-panel > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.tool-approval-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong));
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
+}
+
+.tool-approval-card .tool-approval-heading h3 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-approval-status {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tool-approval-status.status-pending {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.tool-approval-status.status-running,
+.tool-approval-status.status-approved {
+  border-color: var(--ring);
+  color: var(--muted-strong);
+}
+
+.tool-approval-status.status-succeeded {
+  border-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.tool-approval-status.status-failed,
+.tool-approval-status.status-denied,
+.tool-approval-status.status-expired,
+.tool-approval-status.status-cancelled {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.tool-approval-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.tool-approval-card details summary {
+  color: var(--muted-strong);
+  cursor: pointer;
+  font-size: 11.5px;
+  user-select: none;
+}
+
+.chat-app .tool-approval-card pre {
+  max-height: 180px;
+  margin: 8px 0 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: 11.5px;
+  line-height: 1.55;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.chat-app .tool-approval-card pre:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.tool-approval-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 11.5px;
+}
+
+.tool-approval-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tool-approval-actions [role='status'] {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .tool-approval-setting {
+    padding-top: 6px;
+  }
+
+  .tool-approval-card {
+    padding: 10px 12px;
+  }
+
+  .chat-app .tool-approval-card pre {
+    max-height: 140px;
+  }
+}
