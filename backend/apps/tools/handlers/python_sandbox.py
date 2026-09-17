@@ -1,11 +1,7 @@
-"""受限 Python 沙箱工具：子进程执行短代码片段，回传 stdout/stderr 与产出的图片。
+"""Trusted-code Python runner with time/output limits and Windows job limits.
 
-约束（写死在实现里，不给模型调）：
-- 独立子进程 + 超时强杀，解释器 -I 隔离启动路径
-- 工作目录为沙箱专属临时目录，代码只能写这里
-- 不允许 import socket / urllib / requests / http / subprocess / multiprocessing / ctypes / asyncio
-- stdout/stderr 截断，防止超长输出撑爆上下文
-- 沙箱目录内生成的 .png/.jpg/.svg 会列进 artifacts，文件名由代码自己定
+The temporary working directory and import checks are not filesystem or network
+isolation. Do not expose this runner to untrusted users or untrusted code.
 """
 import base64
 import os
@@ -14,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 MAX_CODE_CHARS = 8000
@@ -21,6 +18,7 @@ DEFAULT_TIMEOUT = 20
 MAX_TIMEOUT = 60
 MAX_OUTPUT_CHARS = 6000
 MAX_ARTIFACT_BYTES = 2 * 1024 * 1024
+MAX_SANDBOX_MEM_BYTES = 512 * 1024 * 1024
 ARTIFACT_SUFFIXES = {".png", ".jpg", ".jpeg", ".svg"}
 
 BLOCKED_MODULES = (
@@ -35,7 +33,7 @@ BLOCKED_RE = re.compile(
 META = {
     "source": "builtin",
     "runtime": "sandbox",
-    "notes": "Restricted subprocess Python: no network/subprocess modules, temp working dir, hard timeout. Chart images written to the sandbox dir are returned as base64 artifacts.",
+    "notes": "Trusted-code runner: timeout, bounded output, and Windows job memory/process-tree limits. Not filesystem or network isolation.",
 }
 
 SCHEMA = {
@@ -85,29 +83,59 @@ def handle(args, context=None):
     os.makedirs(sandbox_root, exist_ok=True)
     workdir = tempfile.mkdtemp(prefix="run-", dir=sandbox_root)
     started = time.monotonic()
+    process = None
+    job = None
+    readers = []
+    outputs = [bytearray(), bytearray()]
+    timed_out = False
+    artifacts = []
     try:
-        process = subprocess.run(
-            [sys.executable, "-I", "-c", code],
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            errors="replace",
+        if os.name == "nt":
+            from services.windows_job import WindowsJob
+
+            job = WindowsJob(MAX_SANDBOX_MEM_BYTES)
+        # User code is delivered only after the process has joined the job.
+        bootstrap = "import sys; exec(compile(sys.stdin.buffer.read().decode('utf-8'), '<tool>', 'exec'))"
+        env = {key: value for key, value in os.environ.items()
+               if key.upper() in {"SYSTEMROOT", "WINDIR", "PATH", "TEMP", "TMP"}}
+        env.update({"MPLCONFIGDIR": workdir, "HOME": workdir, "USERPROFILE": workdir})
+        process = subprocess.Popen(
+            [sys.executable, "-I", "-u", "-c", bootstrap],
+            cwd=workdir, env=env,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            start_new_session=os.name != "nt",
         )
-        timed_out = False
-        returncode = process.returncode
-        stdout = (process.stdout or "")[:MAX_OUTPUT_CHARS]
-        stderr = (process.stderr or "")[:MAX_OUTPUT_CHARS]
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        returncode = -1
-        stdout = (exc.stdout or "")
-        if isinstance(stdout, bytes):
-            stdout = stdout.decode("utf-8", errors="replace")
-        stdout = stdout[:MAX_OUTPUT_CHARS]
-        stderr = f"Execution timed out after {timeout}s and was killed."
-    finally:
+        if job:
+            job.attach(process)
+        for pipe, output in zip((process.stdout, process.stderr), outputs):
+            reader = threading.Thread(target=_drain_output, args=(pipe, output), daemon=True)
+            reader.start()
+            readers.append(reader)
+        process.stdin.write(code.encode("utf-8"))
+        process.stdin.close()
+        try:
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+        _terminate_job(process, job)
+        for reader in readers:
+            reader.join(timeout=5)
+        returncode = process.returncode if process.returncode is not None else -1
+        stdout, stderr = [bytes(output).decode("utf-8", errors="replace")[:MAX_OUTPUT_CHARS]
+                          for output in outputs]
+        if timed_out:
+            stderr = f"Execution timed out after {timeout}s and was killed."
         artifacts = _collect_artifacts(workdir)
+    except Exception as exc:
+        return {"ok": False, "error": f"Python runner could not execute: {exc}"}
+    finally:
+        _terminate_job(process, job)
+        for reader in readers:
+            reader.join(timeout=5)
+        if process:
+            for pipe in (process.stdin, process.stdout, process.stderr):
+                if pipe and not pipe.closed:
+                    pipe.close()
         duration_ms = int((time.monotonic() - started) * 1000)
         shutil.rmtree(workdir, ignore_errors=True)
 
@@ -123,6 +151,34 @@ def handle(args, context=None):
     if timed_out:
         return {"ok": False, "error": stderr, "result": result}
     return {"ok": returncode == 0, "result": result, "error": "" if returncode == 0 else (stderr or f"Exited with code {returncode}")}
+
+
+def _drain_output(pipe, output):
+    try:
+        while True:
+            block = pipe.read(4096)
+            if not block:
+                break
+            remaining = MAX_OUTPUT_CHARS * 4 - len(output)
+            if remaining > 0:
+                output.extend(block[:remaining])
+    except (OSError, ValueError):
+        pass
+
+
+def _terminate_job(process, job):
+    if job:
+        job.close()
+    elif process and os.name != "nt":
+        import signal
+
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    if process and process.poll() is None:
+        process.kill()
+        process.wait(timeout=5)
 
 
 def _collect_artifacts(workdir):

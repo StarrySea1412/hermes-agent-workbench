@@ -1,6 +1,11 @@
 """python_sandbox 沙箱工具的回归测试：执行、阻断、超时、产物收集。"""
 import base64
 import os
+import sys
+import subprocess
+import tempfile
+from pathlib import Path
+from unittest import mock, skipUnless
 
 from django.test import SimpleTestCase
 
@@ -74,11 +79,79 @@ class SandboxGuardTests(SimpleTestCase):
         self.assertFalse(result["ok"])
         self.assertIn("exceeds", result["error"])
 
-    def test_os_writes_confined_to_sandbox_dir(self):
-        # 沙箱目录在系统 temp 下；代码里写相对路径文件应被允许并被清理
-        result = handle({"code": "open('note.txt','w').write('hi')\nprint(os.getcwd())" if False else "import os\nopen('note.txt','w').write('hi')\nprint(os.path.isfile('note.txt'))"})
+    def test_relative_file_is_available_during_execution(self):
+        result = handle({"code": "import os\nopen('note.txt','w').write('hi')\nprint(os.path.isfile('note.txt'))"})
         self.assertTrue(result["ok"])
         self.assertEqual(result["result"]["stdout"].strip(), "True")
+
+
+class SandboxResourceTests(SimpleTestCase):
+    def test_output_is_bounded_while_draining(self):
+        result = handle({"code": "print('x' * 2000000)"})
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(len(result["result"]["stdout"]), python_sandbox.MAX_OUTPUT_CHARS)
+
+    def test_parent_secrets_are_not_inherited(self):
+        with mock.patch.dict(os.environ, {"APP_TEST_SECRET": "not-for-tools"}):
+            result = handle({"code": "import os; print(os.getenv('APP_TEST_SECRET', 'absent'))"})
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["result"]["stdout"].strip(), "absent")
+
+    @skipUnless(os.name == 'nt', 'Windows Job Objects')
+    def test_memory_allocation_over_job_limit_fails(self):
+        result = handle({"code": "data = bytearray(600 * 1024 * 1024); print('allocated')"})
+        self.assertFalse(result["ok"], result)
+        self.assertIn("MemoryError", result["result"]["stderr"])
+
+    @skipUnless(os.name == 'nt', 'Windows Job Objects')
+    def test_job_setup_failure_does_not_run_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / 'should-not-exist'
+            with mock.patch('services.windows_job.WindowsJob.attach', side_effect=OSError('denied')):
+                result = handle({"code": f"open({str(marker)!r}, 'w').write('executed')"})
+            self.assertFalse(result['ok'])
+            self.assertFalse(marker.exists())
+
+    @skipUnless(os.name == 'nt', 'Windows Job Objects')
+    def test_closing_job_terminates_descendant(self):
+        from services.windows_job import WindowsJob
+
+        job = WindowsJob(python_sandbox.MAX_SANDBOX_MEM_BYTES)
+        process = subprocess.Popen(
+            [sys.executable, '-I', '-u', '-c', 'import sys; exec(sys.stdin.read())'],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        child_handle = None
+        try:
+            job.attach(process)
+            code = (
+                'import subprocess, sys, time\n'
+                "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'],"
+                " stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+                'print(child.pid, flush=True)\n'
+            )
+            output, error = process.communicate(code, timeout=5)
+            self.assertEqual(process.returncode, 0, error)
+            # The child inherits the parent's pipes, so use DEVNULL below for a bounded wait.
+            child_pid = int(output.strip())
+            import ctypes
+            from ctypes import wintypes
+            api = job.api
+            api.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            api.OpenProcess.restype = wintypes.HANDLE
+            api.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+            api.WaitForSingleObject.restype = wintypes.DWORD
+            child_handle = api.OpenProcess(0x00100000, False, child_pid)
+            self.assertTrue(child_handle)
+            job.close()
+            self.assertEqual(api.WaitForSingleObject(child_handle, 5000), 0)
+        finally:
+            job.close()
+            if process.poll() is None:
+                process.kill()
+            process.communicate(timeout=5)
+            if child_handle:
+                job.api.CloseHandle(child_handle)
 
 
 class SandboxRegistrationTests(SimpleTestCase):
