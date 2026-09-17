@@ -19,3 +19,22 @@ export async function listToolExecutions(conversationId, { signal } = {}) {
 export function decideToolExecution(id, decision) {
   return client.post(`/tool-executions/${encodeURIComponent(id)}/decision/`, { decision })
 }
+
+export const workspaceWritesKey = (conversationId) => ['workspace-writes', String(conversationId)]
+
+export async function listWorkspaceWrites(conversationId, { signal } = {}) {
+  const payload = await client.get('/workspace-writes/', {
+    params: { conversation_id: conversationId },
+    signal,
+  })
+  const records = Array.isArray(payload) ? payload
+    : Array.isArray(payload?.results) ? payload.results
+      : Array.isArray(payload?.data) ? payload.data
+        : payload?.data?.results
+  if (!Array.isArray(records)) throw new Error('文件写入记录响应格式异常，请稍后刷新。')
+  return records.filter((record) => String(record.conversation_id) === String(conversationId))
+}
+
+export function rollbackWorkspaceWrite(id) {
+  return client.post(`/workspace-writes/${encodeURIComponent(id)}/rollback/`)
+}

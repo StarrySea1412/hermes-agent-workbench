@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { decideToolExecution, listToolExecutions, toolExecutionsKey } from '../../api/toolExecutions'
+import {
+  decideToolExecution, listToolExecutions, listWorkspaceWrites,
+  rollbackWorkspaceWrite, toolExecutionsKey, workspaceWritesKey,
+} from '../../api/toolExecutions'
 
 const STATUS_LABELS = {
   pending: '等待审批',
@@ -11,6 +14,12 @@ const STATUS_LABELS = {
   denied: '已拒绝',
   expired: '已过期',
   cancelled: '已取消',
+}
+
+const WRITE_STATUS_LABELS = {
+  applied: '已应用 · 可回滚',
+  rejected: '应用失败',
+  rolled_back: '已回滚',
 }
 
 function formatTime(value) {
@@ -27,10 +36,19 @@ function plainText(value) {
 export default function ToolApprovalPanel({ conversationId }) {
   const queryClient = useQueryClient()
   const queryKey = toolExecutionsKey(conversationId)
+  const writesKey = workspaceWritesKey(conversationId)
   const { data: records = [], error, isPending, isFetching, refetch } = useQuery({
     queryKey,
     queryFn: ({ signal }) => listToolExecutions(conversationId, { signal }),
     refetchInterval: 3000,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+    retry: false,
+  })
+  const { data: writes = [], error: writesError } = useQuery({
+    queryKey: writesKey,
+    queryFn: ({ signal }) => listWorkspaceWrites(conversationId, { signal }),
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
     staleTime: 0,
     retry: false,
@@ -76,6 +94,23 @@ export default function ToolApprovalPanel({ conversationId }) {
     return String(b.created_at).localeCompare(String(a.created_at))
   })
   const pendingCount = records.filter((record) => record.status === 'pending').length
+  const writeLocks = useRef(new Set())
+  const [writeBusy, setWriteBusy] = useState({})
+  const rollback = async (write) => {
+    if (writeLocks.current.has(write.id) || write.status !== 'applied') return
+    writeLocks.current.add(write.id)
+    setWriteBusy((current) => ({ ...current, [write.id]: true }))
+    try {
+      await rollbackWorkspaceWrite(write.id)
+    } catch (requestError) {
+      const text = requestError.payload?.message || requestError.payload?.detail
+        || requestError.message || '回滚失败，请重试。'
+      setWriteBusy((current) => ({ ...current, [write.id]: text }))
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: writesKey })
+      writeLocks.current.delete(write.id)
+    }
+  }
 
   return (
     <section className="tool-approval-panel" aria-label="当前会话工具审批" tabIndex={0}>
@@ -87,7 +122,40 @@ export default function ToolApprovalPanel({ conversationId }) {
       </div>
       {error ? <p className="tool-approval-error" role="alert">无法同步审批记录：{error.message}。请刷新重试，当前状态可能已变化。</p> : null}
       {isPending && !error ? <p role="status">正在加载审批记录…</p> : null}
-      {!isPending && !error && !records.length ? <p className="tool-approval-empty">暂无工具执行记录；新的 Python 审批会显示在这里。</p> : null}
+      {!isPending && !error && !records.length ? <p className="tool-approval-empty">暂无工具执行记录；新的审批会显示在这里。</p> : null}
+      {writes.length || writesError ? (
+        <div className="tool-approval-writes">
+          <strong>文件写入记录</strong>
+          {writesError ? <p className="tool-approval-error" role="alert">无法同步写入记录：{writesError.message}</p> : null}
+          {writes.map((write) => {
+            const busyState = writeBusy[write.id]
+            const busy = busyState === true
+            return (
+              <article key={write.id} className="tool-approval-card" aria-label={`文件写入 ${write.path}`}>
+                <div className="tool-approval-heading">
+                  <h3>{write.path}</h3>
+                  <span className={`tool-approval-status status-${write.status}`} role="status">
+                    {WRITE_STATUS_LABELS[write.status] || `未知状态：${write.status}`}
+                  </span>
+                </div>
+                <details>
+                  <summary>查看改动差异（仅展示文本）</summary>
+                  <pre tabIndex={0} aria-label={`${write.path} 的差异`}><code>{write.diff || '（无差异）'}</code></pre>
+                </details>
+                {write.error ? <p className="tool-approval-error">{write.error}</p> : null}
+                {write.status === 'applied' ? (
+                  <div className="tool-approval-actions">
+                    <button type="button" className="ghost-button" disabled={busy} onClick={() => rollback(write)}>
+                      回滚到改动前
+                    </button>
+                    <span role="status">{busy ? '正在回滚…' : typeof busyState === 'string' ? busyState : '回滚会恢复改动前的文件内容。'}</span>
+                  </div>
+                ) : null}
+              </article>
+            )
+          })}
+        </div>
+      ) : null}
       {sorted.map((record) => {
         const state = decisions[record.id] || {}
         const deadline = record.expires_at ? Date.parse(record.expires_at) : NaN
