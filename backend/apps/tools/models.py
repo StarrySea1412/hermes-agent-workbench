@@ -80,3 +80,29 @@ class ToolExecution(models.Model):
     class Meta:
         db_table = "tool_executions"
         ordering = ["created_at", "id"]
+
+
+class WorkspaceWrite(models.Model):
+    """One versioned workspace file write; the file content itself is the truth."""
+
+    STATUS_CHOICES = [(value, value) for value in ("applied", "rejected", "rolled_back")]
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="workspace_writes")
+    conversation = models.ForeignKey(
+        "projects.Conversation", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="workspace_writes")
+    run = models.ForeignKey(
+        "agents.AgentRun", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="workspace_writes")
+    path = models.CharField(max_length=512)
+    previous = models.TextField(null=True, blank=True)
+    proposed = models.TextField()
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="applied", db_index=True)
+    applied = models.BooleanField(default=False)
+    error = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "workspace_writes"
+        ordering = ["-created_at", "id"]

@@ -1,12 +1,13 @@
 """Runtime registry for built-in agent tools."""
 
-from apps.tools.handlers import doc_export, doc_parse, python_sandbox, web_search
+from apps.tools.handlers import doc_export, doc_parse, python_sandbox, web_search, workspace_files
 
 TOOL_HANDLERS = {
     "doc_parse": doc_parse.handle,
     "doc_export": doc_export.handle,
     "web_search": web_search.handle,
     "python_sandbox": python_sandbox.handle,
+    "workspace_files": workspace_files.handle,
 }
 
 
@@ -29,7 +30,7 @@ def execute_tool(name, args, context=None):
         if name.startswith("mcp_"):
             return {"ok": False, "error": "审批模式暂不支持 MCP（包括发现和调用）。"}
     handler = get_handler(name)
-    if binding and name == "python_sandbox":
+    if binding and name in ("python_sandbox", "workspace_files"):
         return execute_approved(name, args, context, handler, binding)
     if handler is None:
         if name.startswith("mcp_"):

@@ -46,9 +46,9 @@ MODE_INSTRUCTIONS = {
 }
 
 MODE_TOOL_NAMES = {
-    "chat": ["doc_parse", "web_search", "doc_export", "python_sandbox"],
-    "deck": ["doc_parse", "web_search", "doc_export", "python_sandbox"],
-    "report": ["doc_parse", "web_search", "doc_export", "python_sandbox"],
+    "chat": ["doc_parse", "web_search", "doc_export", "python_sandbox", "workspace_files"],
+    "deck": ["doc_parse", "web_search", "doc_export", "python_sandbox", "workspace_files"],
+    "report": ["doc_parse", "web_search", "doc_export", "python_sandbox", "workspace_files"],
 }
 
 MAX_HERMES_TURNS = 6
