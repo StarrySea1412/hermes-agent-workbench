@@ -67,6 +67,7 @@ class Conversation(models.Model):
     # 会话级模型覆盖：非空时 compat 链路用这个模型名（同 provider/base_url），清空回到全局配置
     model_override = models.CharField(max_length=128, blank=True, default="")
     # 聊天回合取消标记（DB 后端，多 worker/多机安全）；回合开始清零，finally 清零
+    tool_approval_required = models.BooleanField(default=False)
     cancel_requested = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

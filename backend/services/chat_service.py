@@ -9,6 +9,7 @@ from apps.projects.models import Message
 from apps.tools import registry, schemas
 from services.ai_service import AIService, describe_ai_exception
 from services.chat_cancel import is_chat_cancelled
+from services.tool_approval import ApprovalUnavailable
 from services.document_analyzer import DocumentAnalyzer
 from services.hermes_service import build_session_id, create_hermes_service
 from services.tool_call_parser import parse_tool_calls
@@ -210,6 +211,39 @@ class ChatService:
             logger.exception("Failed to create AgentRun for conversation_id=%s", conversation.id)
 
         compat = self._get_compat_agent(conversation)
+        controlled = bool(getattr(conversation, "tool_approval_required", False))
+        if controlled:
+            # 审批模式仅支持本地 compat 模型链：无 Hermes、无网关回退、无本地兜底。
+            if compat is None:
+                yield "status", {
+                    "stage": "approval_mode_error",
+                    "gateway": "compat",
+                    "session_id": session_id,
+                    "message": "审批模式需要已配置可用的本地兼容模型（未配置或不支持时明确失败）。",
+                }
+                if agent_run is not None:
+                    try:
+                        from django.utils import timezone
+                        agent_run.update_status_atomic(
+                            "failed", error="审批模式未配置本地兼容模型。", completed_at=timezone.now(),
+                        )
+                    except Exception:
+                        logger.exception("Failed to mark controlled chat AgentRun failed")
+                yield "done", {
+                    "reply": "审批模式未能开始：尚未配置可用的本地兼容模型。",
+                    "metadata": {
+                        "gateway": "none", "approval_mode": True, "session_id": session_id,
+                        "mode": conversation.mode, "thoughts": thoughts, "tool_events": tool_events,
+                        "used_tools": used_tools, "file_count": len(files),
+                        "agent_run_id": getattr(agent_run, "id", None),
+                    },
+                }
+                return
+            yield from self._stream_controlled_turn(
+                compat, conversation, base_history, files, session_id, tool_names,
+                thoughts, tool_events, used_tools, agent_run,
+            )
+            return
         prefer_compat = compat is not None and os.getenv("CHAT_PREFER_GATEWAY", "").lower() not in ("1", "true", "yes")
         hermes = create_hermes_service(session_id=session_id)
 
@@ -280,6 +314,202 @@ class ChatService:
             "gateway": "fallback",
             "session_id": session_id,
             "model_name": self._get_runtime_model_name(),
+            "mode": conversation.mode,
+            "thoughts": thoughts,
+            "tool_events": tool_events,
+            "used_tools": used_tools,
+            "file_count": len(files),
+            "agent_run_id": getattr(agent_run, "id", None),
+        }
+        if rag_sources:
+            metadata["rag_sources"] = rag_sources
+        for chunk in chunk_text(reply):
+            yield "delta", {"content": chunk}
+        yield "done", {"reply": reply, "metadata": metadata}
+
+    def _stream_controlled_turn(
+        self,
+        compat,
+        conversation,
+        base_history,
+        files,
+        session_id,
+        tool_names,
+        thoughts,
+        tool_events,
+        used_tools,
+        agent_run,
+    ):
+        """受控（审批模式）回合：单一路径，无 Hermes/MCP/兜底分支。
+
+        与 _stream_agent_reply 相同的线程+队列流式结构，但 MCP 工具发现被禁用，
+        且缺少运行记录时 fail closed（审批闸门要求可定位的 run）。
+        """
+        import queue
+        import threading
+        from copy import deepcopy
+        from django.db import close_old_connections
+        from services.chat_cancel import TurnCancelled
+        from services.tool_approval import check_cancelled, close_run_executions
+
+        if agent_run is None:
+            raise ApprovalUnavailable("审批模式缺少运行记录，无法执行工具。")
+        stopped = threading.Event()
+
+        def should_cancel():
+            if stopped.is_set():
+                return True
+            try:
+                check_cancelled({}, (agent_run, conversation))
+            except TurnCancelled:
+                return True
+            return False
+
+        file_prompt = self._build_file_prompt(files)
+        retrieval_prompt, rag_sources = self._build_retrieval_prompt(conversation, list(base_history))
+        memory_prompt = self._build_memory_prompt(conversation, list(base_history))
+        event_queue: queue.Queue = queue.Queue()
+        DONE = object()
+
+        def build_system_prompt(native_tools_enabled, tools_prompt_text):
+            return self._build_system_prompt(
+                conversation,
+                file_prompt + retrieval_prompt,
+                "" if native_tools_enabled else tools_prompt_text,
+                memory_prompt=memory_prompt,
+            )
+
+        def on_event(event_type, payload):
+            event_queue.put((event_type, deepcopy(payload)))
+            if event_type == "thought":
+                thoughts.append(payload)
+            elif event_type == "tool_call":
+                name = payload.get("name") or ""
+                if name and name not in used_tools:
+                    used_tools.append(name)
+                if payload not in tool_events:
+                    tool_events.append(payload)
+            elif event_type == "tool_result" and agent_run is not None:
+                self._record_tool_step(agent_run, payload)
+
+        tool_context = {
+            "user": self.user,
+            "user_id": self.user.id,
+            "project_id": conversation.project_id,
+            "conversation_id": conversation.id,
+            "run_id": getattr(agent_run, "id", None),
+            "should_cancel": should_cancel,
+            "tool_approval_required": True,
+            "on_event": on_event,
+        }
+        if agent_run is None:
+            # 审批闸门缺少可绑定的运行记录时 fail closed：直接失败而不是退回无审批执行
+            raise ApprovalUnavailable("审批模式缺少运行记录，无法安全执行工具。")
+
+        def run_loop():
+            try:
+                loop_result = run_tool_loop(
+                    agent=compat,
+                    history=list(base_history),
+                    tool_names=tool_names,
+                    build_system_prompt=build_system_prompt,
+                    tool_context=tool_context,
+                    max_turns=MAX_HERMES_TURNS,
+                    extra_tools=None,
+                    on_event=on_event,
+                    should_cancel=should_cancel,
+                )
+                event_queue.put(("__result__", loop_result))
+            except Exception as exc:
+                event_queue.put(("__error__", exc))
+            finally:
+                close_old_connections()
+                event_queue.put(DONE)
+
+        outcome = "failed"
+        try:
+            worker = threading.Thread(target=run_loop, daemon=True)
+            worker.start()
+
+            loop_result = None
+            stream_error = None
+            while True:
+                if should_cancel():
+                    raise TurnCancelled("已停止本轮生成。")
+                try:
+                    item = event_queue.get(timeout=0.5)
+                except queue.Empty:
+                    yield "heartbeat", {}
+                    continue
+                if item is DONE:
+                    break
+                event_type, payload = item
+                if event_type == "__result__":
+                    loop_result = payload
+                    continue
+                if event_type == "__error__":
+                    stream_error = payload
+                    continue
+                if event_type == "tool_approval":
+                    yield "tool_approval", payload
+                elif event_type == "status":
+                    yield "status", {
+                        "stage": payload.get("stage") or "tool_fallback",
+                        "gateway": "compat",
+                        "session_id": session_id,
+                        "message": payload.get("message", ""),
+                    }
+                elif event_type in ("thought", "thought_delta", "answer_delta", "tool_call", "tool_result"):
+                    yield event_type, payload
+
+            if stream_error is not None:
+                raise stream_error
+            if loop_result is None:
+                raise RuntimeError("Tool loop finished without a result.")
+
+            for name in loop_result.used_tools:
+                if name not in used_tools:
+                    used_tools.append(name)
+
+            if should_cancel():
+                from services.chat_cancel import TurnCancelled
+
+                raise TurnCancelled("已由用户停止本轮生成。")
+
+            reply = loop_result.reply
+            if not reply:
+                raise RuntimeError(
+                    "模型这轮只输出了思考内容，没有生成正文。请重新发送，或在设置页换一个模型 / 调大输出上限。"
+                )
+
+            if agent_run is not None:
+                from django.utils import timezone
+
+                agent_run.update_status_atomic(
+                    "done",
+                    answer=reply,
+                    tools_used=list(used_tools),
+                    completed_at=timezone.now(),
+                )
+
+            outcome = "done"
+        except (GeneratorExit, TurnCancelled):
+            outcome = "cancelled"
+            raise
+        finally:
+            stopped.set()
+            worker.join(timeout=2)
+            if outcome != "done":
+                agent_run.update_status_atomic(outcome, error="受控回合已结束。")
+            close_run_executions(agent_run.id, "cancelled" if outcome == "cancelled" else "failed")
+
+        metadata = {
+            **self.extract_delivery_metadata(reply),
+            "gateway": "compat",
+            "approval_mode": True,
+            "session_id": session_id,
+            "model_name": self._get_runtime_model_name(compat),
+            "base_url": self._get_runtime_base_url(compat),
             "mode": conversation.mode,
             "thoughts": thoughts,
             "tool_events": tool_events,

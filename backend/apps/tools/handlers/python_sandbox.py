@@ -61,7 +61,7 @@ SCHEMA = {
 
 
 def handle(args, context=None):
-    del context
+    should_cancel = (context or {}).get("should_cancel")
 
     code = (args.get("code") or "").strip()
     if not code:
@@ -113,10 +113,18 @@ def handle(args, context=None):
             readers.append(reader)
         process.stdin.write(code.encode("utf-8"))
         process.stdin.close()
-        try:
-            process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            timed_out = True
+        deadline = time.monotonic() + timeout
+        while process.poll() is None:
+            if should_cancel and should_cancel():
+                return {"ok": False, "error": "Execution cancelled."}
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                timed_out = True
+                break
+            try:
+                process.wait(timeout=min(0.1, remaining))
+            except subprocess.TimeoutExpired:
+                pass
         _terminate_job(process, job)
         for reader in readers:
             reader.join(timeout=5)

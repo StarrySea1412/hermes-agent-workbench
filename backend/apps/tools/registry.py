@@ -20,7 +20,17 @@ def get_handler(name):
 
 def execute_tool(name, args, context=None):
     """Execute a registered tool and return a structured result dict."""
+    context = context or {}
+    from services.tool_approval import resolve_binding, execute_approved, check_cancelled
+
+    binding = resolve_binding(context)
+    if binding:
+        check_cancelled(context, binding)
+        if name.startswith("mcp_"):
+            return {"ok": False, "error": "审批模式暂不支持 MCP（包括发现和调用）。"}
     handler = get_handler(name)
+    if binding and name == "python_sandbox":
+        return execute_approved(name, args, context, handler, binding)
     if handler is None:
         if name.startswith("mcp_"):
             # MCP 动态工具：按前缀反查用户启用的服务器会话执行

@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -53,3 +55,28 @@ class McpServer(models.Model):
         except json.JSONDecodeError:
             return {}
         return parsed if isinstance(parsed, dict) else {}
+
+
+class ToolExecution(models.Model):
+    """One immutable approval request; only the originating worker may claim it."""
+
+    STATUS_CHOICES = [(value, value) for value in (
+        "pending", "approved", "running", "succeeded", "failed",
+        "denied", "expired", "cancelled",
+    )]
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey("projects.Conversation", on_delete=models.CASCADE, related_name="tool_executions")
+    run = models.ForeignKey("agents.AgentRun", on_delete=models.CASCADE, related_name="tool_executions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tool_executions")
+    tool_name = models.CharField(max_length=128)
+    arguments = models.JSONField(default=dict)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending", db_index=True)
+    decision = models.CharField(max_length=5, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    error = models.TextField(blank=True, default="")
+    result = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = "tool_executions"
+        ordering = ["created_at", "id"]

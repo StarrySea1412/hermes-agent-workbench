@@ -125,6 +125,10 @@ def conversations(request):
         serializer = ConversationSerializer(queryset, many=True, context={"request": request})
         return Response(serializer.data)
 
+    approval = ConversationSerializer(data={
+        "tool_approval_required": request.data.get("tool_approval_required", False),
+    }, partial=True)
+    approval.is_valid(raise_exception=True)
     title = request.data.get("title") or DEFAULT_CHAT_TITLE
     mode = request.data.get("mode", "chat")
     project_id = request.data.get("project_id")
@@ -138,7 +142,10 @@ def conversations(request):
             project_type="report" if mode == "report" else "presentation",
             description=request.data.get("description", ""),
         )
-    conversation = Conversation.objects.create(user=request.user, project=project, title=title, mode=mode)
+    conversation = Conversation.objects.create(
+        user=request.user, project=project, title=title, mode=mode,
+        tool_approval_required=approval.validated_data.get("tool_approval_required", False),
+    )
     return Response(ConversationDetailSerializer(conversation, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
