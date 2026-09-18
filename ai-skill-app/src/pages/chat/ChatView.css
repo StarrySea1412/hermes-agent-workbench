@@ -477,9 +477,7 @@
   min-height: 0;
   overflow: hidden;
   border-left: 1px solid var(--line);
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  background: transparent;
 }
 
 .chat-app .chat-timeline-head {
@@ -535,7 +533,7 @@
   scrollbar-width: thin;
 }
 
-/* 垂直轨道线：贯穿所有节点标记（Codex 式 thread rail） */
+/* 垂直轨道线：贯穿所有节点标记（发丝线，与正文附属块同语言） */
 .chat-app .chat-timeline-list::before {
   content: '';
   position: absolute;
@@ -543,7 +541,7 @@
   top: 12px;
   bottom: 14px;
   width: 1px;
-  background: color-mix(in srgb, var(--muted-strong) 80%, transparent);
+  background: var(--line);
 }
 
 .chat-app .chat-timeline-list li {
@@ -564,7 +562,7 @@
   border-radius: var(--radius);
   color: var(--muted);
   background: transparent;
-  font-size: 11.5px;
+  font-size: 12px;
   text-align: left;
 }
 
@@ -573,43 +571,46 @@
   color: var(--ink);
 }
 
-/* 节点标记：骑在轨道线上的圆形徽标 */
+/* 节点标记：骑在轨道线上的小圆点——类型靠颜色区分，不再用图标徽章 */
 .chat-app .chat-timeline-icon {
   grid-column: 1;
   position: relative;
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
-  margin-left: 4px;
-  border: 1px solid var(--line-strong);
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border: 0;
   border-radius: 50%;
-  color: var(--muted);
-  background: var(--bg);
+  background: var(--muted-strong);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-app .chat-timeline-icon .icon {
+  display: none;
+}
+
+.chat-app .chat-timeline-item:hover .chat-timeline-icon {
+  transform: scale(1.25);
 }
 
 .chat-app .chat-timeline-item.user .chat-timeline-icon {
-  border-color: transparent;
-  color: var(--primary-fg);
   background: var(--brand-grad);
 }
 
 .chat-app .chat-timeline-item.tool .chat-timeline-icon {
-  border-color: transparent;
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 16%, var(--bg));
+  background: color-mix(in srgb, var(--success) 60%, var(--bg));
 }
 
 .chat-app .chat-timeline-item.tool.failed .chat-timeline-icon {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 16%, var(--bg));
+  background: color-mix(in srgb, var(--danger) 60%, var(--bg));
 }
 
+/* 回答节点：空心环，与实心用户点形成"实/虚"对仗 */
 .chat-app .chat-timeline-item.answer .chat-timeline-icon {
-  color: var(--primary);
   background: var(--bg);
-  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--primary) 65%, transparent);
 }
 
 .chat-app .chat-timeline-item.active {
@@ -618,9 +619,11 @@
 }
 
 .chat-app .chat-timeline-item.active .chat-timeline-icon {
-  border-color: var(--primary);
-  color: var(--primary);
   box-shadow: 0 0 0 3px var(--ring);
+}
+
+.chat-app .chat-timeline-item.answer.active .chat-timeline-icon {
+  box-shadow: inset 0 0 0 1.5px var(--primary), 0 0 0 3px var(--ring);
 }
 
 .chat-app .chat-timeline-text {
