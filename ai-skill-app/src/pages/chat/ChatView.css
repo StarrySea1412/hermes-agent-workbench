@@ -10,7 +10,9 @@
 
 .chat-app .chat-main {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  /* 三行：顶栏 / 受控执行开关 / 工作区——开关必须独占 auto 行，
+     否则会被 1fr 压扁导致内容溢出叠到消息上 */
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -466,51 +468,83 @@
   overflow: hidden;
 }
 
+.chat-app .message-list-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* 显式单行约束：保证消息列表获得确定高度、内部滚动，
+     否则 auto 行会被内容撑开、内容溢出到开关区与输入框下层（叠字根因之一） */
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .chat-app .message-list-wrap.with-timeline {
   grid-template-columns: 28px minmax(0, 1fr);
 }
 
-/* 左侧节点刻度轨（Codex 式 tick rail）：一排小刻度线均匀铺满整列高度，
-   hover/点击跳转对应节点，刻度颜色仅区分失败与当前位置 */
+/* 左侧节点刻度轨：密集居中的一排刻度，而非稀疏铺满整列；
+   每个刻度是 14px 高的按钮命中区，hover 放大并弹出手写玻璃提示 */
 .chat-app .chat-timeline {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: space-evenly;
+  align-items: stretch;
+  justify-content: safe center;
+  gap: 6px;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
-  padding: 14px 0;
+  padding: 12px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: transparent;
+  scrollbar-width: none;
+}
+
+.chat-app .chat-timeline::-webkit-scrollbar {
+  display: none;
 }
 
 .chat-app .chat-timeline-tick {
+  display: grid;
   flex: 0 0 auto;
-  width: 12px;
-  height: 2px;
+  place-items: center;
+  width: 100%;
+  height: 14px;
   padding: 0;
   border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.chat-app .chat-timeline-tick::after {
+  content: '';
+  width: 12px;
+  height: 2px;
   border-radius: 1px;
   background: var(--line-strong);
-  cursor: pointer;
   transition: width 0.15s ease, background 0.15s ease;
 }
 
 .chat-app .chat-timeline-tick:hover {
+  background: var(--hover);
+}
+
+.chat-app .chat-timeline-tick:hover::after {
   width: 18px;
   background: var(--ink);
 }
 
-.chat-app .chat-timeline-tick.failed {
+.chat-app .chat-timeline-tick.failed::after {
   background: color-mix(in srgb, var(--danger) 55%, var(--line-strong));
 }
 
-.chat-app .chat-timeline-tick.active {
+.chat-app .chat-timeline-tick.active::after {
   width: 18px;
   background: var(--primary);
 }
 
-.chat-app .chat-timeline-tick.failed.active {
+.chat-app .chat-timeline-tick.failed.active::after {
   background: var(--danger);
 }
 
@@ -707,6 +741,7 @@
 
   .chat-app .chat-timeline-mobile {
     display: flex;
+    grid-column: 1 / -1;
     gap: 6px;
     align-items: center;
     min-width: 0;
