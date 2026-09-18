@@ -52,11 +52,9 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages])
 
-  // 有工具调用或回答较多的对话才显示节点导航；用户可手动收起
+  // 有工具调用或回答较多的对话才显示左侧节点刻度轨（Codex 式 tick rail）
   const nodes = useMemo(() => buildTimelineNodes(messages), [messages])
-  const enoughNodes = nodes.length >= 3
-  const [collapsed, setCollapsed] = useState(false)
-  const showTimeline = enoughNodes && !collapsed
+  const showTimeline = nodes.length >= 3
 
   // 滚动联动：视口上方 1/3 处所在的节点视为当前位置（Codex 式 active 追踪）
   const [activeAnchor, setActiveAnchor] = useState(null)
@@ -104,6 +102,22 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
 
   return (
     <div className={`message-list-wrap ${showTimeline ? 'with-timeline' : ''}`}>
+      {showTimeline ? (
+        <nav className="chat-timeline" aria-label="对话节点">
+          {nodes.map((node) => (
+            <button
+              key={node.anchorId}
+              type="button"
+              className={`chat-timeline-tick ${node.kind} ${node.failed ? 'failed' : ''} ${activeAnchor === node.anchorId ? 'active' : ''}`}
+              title={node.preview}
+              aria-label={node.preview}
+              aria-current={activeAnchor === node.anchorId ? 'true' : undefined}
+              onClick={() => jumpTo(node)}
+            />
+          ))}
+        </nav>
+      ) : null}
+
       <div className="message-list" ref={listRef}>
         {messages.map((message, index) => (
           <MessageBubble
@@ -116,42 +130,6 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
         ))}
         <div ref={endRef} />
       </div>
-
-      {showTimeline ? (
-        <nav className="chat-timeline" aria-label="对话节点">
-          <div className="chat-timeline-head">
-            <span>对话节点 · {nodes.length}</span>
-            <button
-              type="button"
-              className={`chat-timeline-toggle ${collapsed ? 'collapsed' : ''}`}
-              title={collapsed ? '展开节点' : '收起节点'}
-              onClick={() => setCollapsed((closed) => !closed)}
-            >
-              <Icon name="chevron" size={13} />
-            </button>
-          </div>
-          {!collapsed ? (
-            <ul className="chat-timeline-list">
-              {nodes.map((node) => (
-                <li key={node.anchorId}>
-                  <button
-                    type="button"
-                    className={`chat-timeline-item ${node.kind} ${node.failed ? 'failed' : ''} ${activeAnchor === node.anchorId ? 'active' : ''}`}
-                    title={node.preview}
-                    aria-current={activeAnchor === node.anchorId ? 'true' : undefined}
-                    onClick={() => jumpTo(node)}
-                  >
-                    <span className="chat-timeline-icon" aria-hidden="true">
-                      <Icon name={node.icon} size={10} />
-                    </span>
-                    <span className="chat-timeline-text">{node.preview}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </nav>
-      ) : null}
 
       {nodes.length >= 2 ? (
         <nav className="chat-timeline-mobile" aria-label="对话节点">
