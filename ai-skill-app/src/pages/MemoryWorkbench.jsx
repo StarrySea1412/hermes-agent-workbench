@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createAgentMemory, deleteAgentMemory, listAgentMemories, listAgentRuns, updateAgentMemory } from '../api/agents'
 import ChatFrame from '../components/chat/ChatFrame'
+import GlassSelect from '../components/GlassSelect'
 
 const EMPTY_FORM = {
   title: '',
@@ -180,17 +181,19 @@ function MemoryEditor({ selectedMemory, runs, queryClient, onSelectedId }) {
             required
           />
         </label>
-        <label className="field">
+        <div className="field">
           <span>作用域</span>
-          <select
+          <GlassSelect
+            ariaLabel="作用域"
             value={form.scope}
-            onChange={(event) => setForm((current) => ({ ...current, scope: event.target.value }))}
-          >
-            <option value="user">用户</option>
-            <option value="workspace">工作台</option>
-            <option value="run">运行</option>
-          </select>
-        </label>
+            onChange={(scope) => setForm((current) => ({ ...current, scope }))}
+            options={[
+              { value: 'user', label: '用户' },
+              { value: 'workspace', label: '工作台' },
+              { value: 'run', label: '运行' },
+            ]}
+          />
+        </div>
       </div>
 
       <label className="field">
@@ -213,18 +216,18 @@ function MemoryEditor({ selectedMemory, runs, queryClient, onSelectedId }) {
             placeholder="使用逗号分隔标签"
           />
         </label>
-        <label className="field">
+        <div className="field">
           <span>来源运行</span>
-          <select
+          <GlassSelect
+            ariaLabel="来源运行"
             value={form.run_id}
-            onChange={(event) => setForm((current) => ({ ...current, run_id: event.target.value }))}
-          >
-            <option value="">不关联运行</option>
-            {runs.map((run) => (
-              <option key={run.id} value={run.id}>{`#${run.id} ${truncate(run.task, 56)}`}</option>
-            ))}
-          </select>
-        </label>
+            onChange={(run_id) => setForm((current) => ({ ...current, run_id }))}
+            options={[
+              { value: '', label: '不关联运行' },
+              ...runs.map((run) => ({ value: String(run.id), label: `#${run.id} ${truncate(run.task, 56)}` })),
+            ]}
+          />
+        </div>
       </div>
 
       <div className="field checkbox-field">

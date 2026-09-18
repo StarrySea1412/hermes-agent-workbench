@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createAgentRun } from '../../api/agents'
+import GlassSelect from '../GlassSelect'
 
 export default function RunComposer({
   templates = [],
@@ -85,17 +86,18 @@ export default function RunComposer({
       </label>
 
       <div className="field-grid">
-        <label className="field">
+        <div className="field">
           <span>智能体模板</span>
-          <select value={agentId} onChange={(event) => setAgentId(event.target.value)}>
-            <option value="">默认运行时</option>
-            {activeTemplates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <GlassSelect
+            ariaLabel="智能体模板"
+            value={agentId}
+            onChange={setAgentId}
+            options={[
+              { value: '', label: '默认运行时' },
+              ...activeTemplates.map((template) => ({ value: template.id, label: template.name })),
+            ]}
+          />
+        </div>
 
         <label className="field">
           <span>最大步数</span>
