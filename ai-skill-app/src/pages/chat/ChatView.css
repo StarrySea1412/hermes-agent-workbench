@@ -165,13 +165,14 @@
   display: none;
 }
 
-/* Codex 风格：思考区是浅底色块，无独立边框 */
+/* 附属信息块（思考/任务清单/工具轨迹）：无底色，仅靠左缘发丝线与正文分层，
+   避免三类块堆叠成"多层色底"的杂乱感 */
 .chat-app .thought-panel {
   margin: 0 0 10px;
   border: 0;
-  border-left: 2px solid var(--line-strong);
+  border-left: 2px solid var(--line);
   border-radius: 0;
-  background: var(--surface-soft);
+  background: transparent;
   overflow: hidden;
 }
 
@@ -328,11 +329,12 @@
 
 /* ---------------- 任务清单（Codex 风格计划） ---------------- */
 
+/* 任务清单与思考区同语言：无底色 + 左缘发丝线，运行中左缘才着色 */
 .chat-app .task-checklist {
   margin: 0 0 10px;
-  border-left: 2px solid var(--line-strong);
+  border-left: 2px solid var(--line);
   border-radius: 0;
-  background: var(--surface-soft);
+  background: transparent;
   overflow: hidden;
 }
 
@@ -743,22 +745,16 @@
   background: transparent;
 }
 
-/* 助手消息玻璃气泡：奶白半透明 + 顶部高光，扩大玻璃覆盖率 */
+/* 助手回答节点：无边框轻底色块——文字才是主角，靠头像与左缘自然对齐成组，
+   不再套玻璃卡片（参考用户提供的"无边框淡底"设计） */
 .chat-app .message-row.assistant .message-bubble {
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 6px 16px 16px 16px;
-  background: linear-gradient(var(--surface-soft), var(--surface-soft));
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 1px 1px var(--glass-sheen),
-    inset 0 -1px 1px rgba(20, 20, 19, 0.04),
-    0 8px 22px rgba(20, 20, 19, 0.06);
-}
-
-.chat-app .message-row.assistant .message-bubble .thought-panel,
-.chat-app .message-row.assistant .message-bubble .tool-trace {
-  background: var(--bg);
+  padding: 4px 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .chat-app .message-role {
@@ -944,13 +940,13 @@
 
 /* ---------------- 工具轨迹 ---------------- */
 
-/* Codex 式：工具轨迹与思考区同语言——左缘细线块,行间发丝分隔,状态仅靠小图标着色 */
+/* 工具轨迹与思考区同语言——左缘发丝线,行间发丝分隔,状态仅靠小图标着色 */
 .chat-app .tool-trace {
   min-width: 0;
   margin: 0 0 10px;
-  border-left: 2px solid var(--line-strong);
+  border-left: 2px solid var(--line);
   border-radius: 0;
-  background: var(--surface-soft);
+  background: transparent;
   overflow: hidden;
 }
 

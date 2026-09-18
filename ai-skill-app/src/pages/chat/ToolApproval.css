@@ -75,14 +75,20 @@
   grid-template-rows: minmax(0, 1fr) auto auto auto;
 }
 
-/* 审批面板：置于消息区内，玻璃卡片风格 */
+/* 审批面板：置于消息区内；轻量玻璃卡，避免粗边框大块观感 */
 .tool-approval-panel {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   margin: 0 auto;
   padding: 0 clamp(16px, 3vw, 36px);
   max-width: 860px;
   width: 100%;
+}
+
+/* 无待审批且无记录时整块弱化成一行轻提示 */
+.tool-approval-panel.idle {
+  grid-auto-rows: min-content;
+  opacity: 0.75;
 }
 
 .tool-approval-heading {
@@ -95,8 +101,9 @@
 
 .tool-approval-heading strong {
   overflow: hidden;
-  font-size: 12.5px;
-  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -117,21 +124,25 @@
   position: relative;
   display: grid;
   gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--line-strong);
+  padding: 10px 14px;
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong));
+  background: var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow),
-    0 10px 28px rgba(20, 20, 19, 0.08);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), 0 4px 14px rgba(20, 20, 19, 0.05);
   transition: border-color 0.15s ease, box-shadow 0.2s ease;
 }
 
 .tool-approval-card:hover {
   border-color: color-mix(in srgb, var(--warning) 40%, transparent);
-  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow),
-    0 14px 34px rgba(20, 20, 19, 0.12);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), 0 8px 20px rgba(20, 20, 19, 0.08);
+}
+
+/* 待审批卡片唯一允许轻微强调：warning 左缘线 */
+.tool-approval-card:has(.tool-approval-status.status-pending) {
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--line));
+  border-left: 3px solid var(--warning);
 }
 
 .tool-approval-card .tool-approval-heading h3 {
@@ -146,7 +157,7 @@
 .tool-approval-status {
   flex: 0 0 auto;
   padding: 2px 8px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted-strong);
   font-size: 11px;
@@ -213,6 +224,11 @@
 .chat-app .tool-approval-card pre:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--ring);
+}
+
+/* 收起态（非 pending）的 details 摘要弱化为正文注脚 */
+.tool-approval-card:not(:has(.tool-approval-status.status-pending)) details summary {
+  color: var(--muted);
 }
 
 .tool-approval-error {
