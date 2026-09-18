@@ -114,15 +114,24 @@
 }
 
 .tool-approval-card {
+  position: relative;
   display: grid;
   gap: 8px;
   padding: 12px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
   background: linear-gradient(var(--glass-bg-strong), var(--glass-bg-strong));
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow),
+    0 10px 28px rgba(20, 20, 19, 0.08);
+  transition: border-color 0.15s ease, box-shadow 0.2s ease;
+}
+
+.tool-approval-card:hover {
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow),
+    0 14px 34px rgba(20, 20, 19, 0.12);
 }
 
 .tool-approval-card .tool-approval-heading h3 {
