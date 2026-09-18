@@ -37,7 +37,7 @@ export default function ToolApprovalPanel({ conversationId }) {
   const queryClient = useQueryClient()
   const queryKey = toolExecutionsKey(conversationId)
   const writesKey = workspaceWritesKey(conversationId)
-  const { data: records = [], error, isPending, isFetching, refetch } = useQuery({
+  const { data: records = [], error, isFetching, refetch } = useQuery({
     queryKey,
     queryFn: ({ signal }) => listToolExecutions(conversationId, { signal }),
     refetchInterval: 3000,
@@ -112,22 +112,18 @@ export default function ToolApprovalPanel({ conversationId }) {
     }
   }
 
-  // 无记录且无写入时弱化为占位一行，不再占据整块卡片
-  const idle = !isPending && !error && !records.length && !writes.length && !writesError
+  // 无审批记录、无写入、无错误时整块不渲染——空面板不占聊天版面
+  if (!error && !records.length && !writes.length && !writesError) return null
 
   return (
-    <section className={`tool-approval-panel ${idle ? 'idle' : ''}`} aria-label="当前会话工具审批" tabIndex={0}>
+    <section className="tool-approval-panel" aria-label="当前会话工具审批" tabIndex={0}>
       <div className="tool-approval-heading">
         <strong>工具审批 <span role="status">{pendingCount ? `· ${pendingCount} 项待处理` : '· 无待审批'}</span></strong>
-        {idle ? null : (
-          <button type="button" className="ghost-button" disabled={isFetching} onClick={() => refetch()} aria-label="刷新工具审批记录">
-            {isFetching ? '同步中…' : '刷新'}
-          </button>
-        )}
+        <button type="button" className="ghost-button" disabled={isFetching} onClick={() => refetch()} aria-label="刷新工具审批记录">
+          {isFetching ? '同步中…' : '刷新'}
+        </button>
       </div>
       {error ? <p className="tool-approval-error" role="alert">无法同步审批记录：{error.message}。请刷新重试，当前状态可能已变化。</p> : null}
-      {isPending && !error ? <p role="status">正在加载审批记录…</p> : null}
-      {!isPending && !error && !records.length ? <p className="tool-approval-empty">暂无工具执行记录；新的审批会显示在这里。</p> : null}
       {writes.length || writesError ? (
         <div className="tool-approval-writes">
           <strong>文件写入记录</strong>

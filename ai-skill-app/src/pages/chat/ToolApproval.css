@@ -1,22 +1,89 @@
 /* 受控执行（tool_approval_required）开关与审批面板：复用聊天玻璃变量 */
-
-.tool-approval-setting {
-  display: grid;
-  gap: 4px;
-  margin: 0 auto;
-  padding: 8px clamp(16px, 3vw, 36px) 6px;
-  max-width: 860px;
-  width: 100%;
-}
+/* 开关常驻顶栏左上角（chat-title-block 内），说明收进 info 悬浮卡，不占聊天纵向空间 */
 
 .chat-app .tool-approval-toggle {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   width: fit-content;
   color: var(--ink);
-  font-size: 12.5px;
+  font-size: 12px;
   cursor: pointer;
+}
+
+.chat-app .tool-approval-state {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.chat-app .tool-approval-state.on {
+  color: var(--success);
+}
+
+.chat-app .tool-approval-state.error {
+  color: var(--danger);
+}
+
+/* info 标记与悬浮说明卡 */
+.tool-approval-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+}
+
+.tool-approval-info:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.tool-approval-info-pop {
+  position: absolute;
+  left: -6px;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: max-content;
+  max-width: min(460px, calc(100vw - 48px));
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: 0 12px 32px rgba(20, 20, 19, 0.16);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.55;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-2px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+  pointer-events: none;
+}
+
+.tool-approval-info:hover .tool-approval-info-pop,
+.tool-approval-info:focus-visible .tool-approval-info-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.tool-approval-info-pop .tool-approval-error {
+  display: block;
+  margin: 0 0 4px;
 }
 
 .chat-app .tool-approval-toggle input[type='checkbox'] {
@@ -64,13 +131,6 @@
   opacity: 0.55;
 }
 
-.tool-approval-setting p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.5;
-}
-
 .chat-app .chat-thread.approval-thread {
   grid-template-rows: minmax(0, 1fr) auto auto auto;
 }
@@ -83,12 +143,6 @@
   padding: 0 clamp(16px, 3vw, 36px);
   max-width: 860px;
   width: 100%;
-}
-
-/* 无待审批且无记录时整块弱化成一行轻提示 */
-.tool-approval-panel.idle {
-  grid-auto-rows: min-content;
-  opacity: 0.75;
 }
 
 .tool-approval-heading {
@@ -113,7 +167,6 @@
   font-weight: 400;
 }
 
-.tool-approval-empty,
 .tool-approval-panel > p {
   margin: 0;
   color: var(--muted);
@@ -250,10 +303,6 @@
 }
 
 @media (max-width: 640px) {
-  .tool-approval-setting {
-    padding-top: 6px;
-  }
-
   .tool-approval-card {
     padding: 10px 12px;
   }

@@ -589,6 +589,32 @@ export default function ChatView() {
         <header className="chat-header">
           <div className="chat-title-block">
             <h1>{conversation?.title || '新任务'}</h1>
+            <label className="tool-approval-toggle">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={approvalRequired}
+                disabled={isSending || approvalBusy || createMutation.isPending || Boolean(convId && !conversation)}
+                onChange={(event) => changeApproval(event.target.checked)}
+                aria-describedby="tool-approval-description"
+              />
+              <strong>受控执行</strong>
+              <span
+                className={`tool-approval-state ${approvalError ? 'error' : approvalRequired ? 'on' : ''}`}
+                role="status"
+              >
+                {approvalBusy ? '保存中…' : approvalError ? '保存失败' : approvalRequired ? '已开启' : '已关闭'}
+              </span>
+            </label>
+            <span className="tool-approval-info" tabIndex={0}>
+              <span aria-hidden="true">i</span>
+              <span className="tool-approval-info-pop" id="tool-approval-description" role="tooltip">
+                {approvalError ? <strong className="tool-approval-error">保存失败：{approvalError}</strong> : null}
+                {approvalRequired
+                  ? '开启后 Python 需逐次审批；暂不支持 Hermes / MCP，需先配置本地模型。'
+                  : '关闭为旧模式，无逐次审批。开启可逐次审批 Python（暂不支持 Hermes / MCP，需本地模型配置）。'}
+              </span>
+            </span>
           </div>
           <div className="chat-header-actions">
             {convId ? (
@@ -654,25 +680,6 @@ export default function ChatView() {
           </div>
         </header>
 
-        <div className="tool-approval-setting">
-          <label className="tool-approval-toggle">
-            <input
-              type="checkbox"
-              role="switch"
-              checked={approvalRequired}
-              disabled={isSending || approvalBusy || createMutation.isPending || Boolean(convId && !conversation)}
-              onChange={(event) => changeApproval(event.target.checked)}
-              aria-describedby="tool-approval-description"
-            />
-            <strong>受控执行{approvalBusy ? ' · 保存中…' : approvalRequired ? ' · 已开启' : ' · 已关闭'}</strong>
-          </label>
-          <p id="tool-approval-description">
-            {approvalRequired
-              ? '开启后 Python 需逐次审批；暂不支持 Hermes / MCP，需先配置本地模型。'
-              : '关闭为旧模式，无逐次审批。开启可逐次审批 Python（暂不支持 Hermes / MCP，需本地模型配置）。'}
-          </p>
-          {approvalError ? <p className="tool-approval-error" role="alert">保存失败：{approvalError}</p> : null}
-        </div>
         <div className="chat-workspace">
           <section className={`chat-thread approval-thread ${messages.length ? '' : 'empty'}`}>
             <details className="mobile-runtime-panel">
