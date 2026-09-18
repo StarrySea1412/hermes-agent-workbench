@@ -514,6 +514,94 @@
   background: var(--danger);
 }
 
+/* 刻度悬浮提示：portal 到 body 渲染（fixed 定位），玻璃卡片 + 类型标签 + 多行内容 */
+.tick-tip {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 48px));
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: 0 12px 32px rgba(20, 20, 19, 0.16);
+  color: var(--ink);
+  pointer-events: none;
+  transform: translateY(-50%);
+  animation: tick-tip-in 0.14s ease;
+}
+
+@keyframes tick-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+}
+
+.tick-tip-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--muted-strong);
+}
+
+.tick-tip.user .tick-tip-dot {
+  background: var(--primary);
+}
+
+.tick-tip.answer .tick-tip-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--primary);
+}
+
+.tick-tip.tool .tick-tip-dot {
+  background: var(--success);
+}
+
+.tick-tip.failed .tick-tip-dot {
+  background: var(--danger);
+}
+
+.tick-tip-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tick-tip-kind {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.tick-tip.failed .tick-tip-kind {
+  color: var(--danger);
+}
+
+.tick-tip-text {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: normal;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+}
+
 .chat-app .chat-timeline-item {
   position: relative;
   display: grid;

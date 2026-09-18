@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Icon from '../Icon'
 import MessageBubble from './MessageBubble'
 
@@ -96,6 +97,15 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
     }
   }
 
+  // 刻度悬浮提示：portal 到 body 用 fixed 定位，避免被消息列 overflow 裁剪
+  const [tickTip, setTickTip] = useState(null)
+  const showTickTip = (node, currentTarget) => {
+    const rect = currentTarget.getBoundingClientRect()
+    const top = Math.min(Math.max(rect.top + rect.height / 2, 90), window.innerHeight - 90)
+    setTickTip({ left: rect.right + 10, top, node })
+  }
+  const hideTickTip = () => setTickTip(null)
+
   if (!messages.length) {
     return null
   }
@@ -109,9 +119,12 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
               key={node.anchorId}
               type="button"
               className={`chat-timeline-tick ${node.kind} ${node.failed ? 'failed' : ''} ${activeAnchor === node.anchorId ? 'active' : ''}`}
-              title={node.preview}
               aria-label={node.preview}
               aria-current={activeAnchor === node.anchorId ? 'true' : undefined}
+              onMouseEnter={(event) => showTickTip(node, event.currentTarget)}
+              onMouseLeave={hideTickTip}
+              onFocus={(event) => showTickTip(node, event.currentTarget)}
+              onBlur={hideTickTip}
               onClick={() => jumpTo(node)}
             />
           ))}
@@ -149,6 +162,23 @@ export default function MessageList({ messages = [], pendingMessageId, onRegener
           ))}
         </nav>
       ) : null}
+
+      {tickTip ? (
+        createPortal(
+          <div
+            className={`tick-tip ${tickTip.node.kind} ${tickTip.node.failed ? 'failed' : ''}`}
+            style={{ left: tickTip.left, top: tickTip.top }}
+            role="tooltip"
+          >
+            <span className="tick-tip-dot" aria-hidden="true" />
+            <div className="tick-tip-body">
+              <strong className="tick-tip-kind">{tickTip.node.kindLabel}{tickTip.node.failed ? ' · 失败' : ''}</strong>
+              <p className="tick-tip-text">{tickTip.node.detail || tickTip.node.preview}</p>
+            </div>
+          </div>,
+          document.body,
+        )
+      ) : null}
     </div>
   )
 }
@@ -161,8 +191,10 @@ function buildTimelineNodes(messages) {
         messageId: message.id,
         anchorId: `msg-${message.id}`,
         kind: 'user',
+        kindLabel: '用户消息',
         icon: 'user',
         preview: truncate(String(message.content || '用户消息'), NODE_PREVIEW_MAX),
+        detail: truncate(String(message.content || '用户消息'), 320),
       })
       continue
     }
@@ -172,19 +204,24 @@ function buildTimelineNodes(messages) {
         messageId: message.id,
         anchorId: `msg-${message.id}-tool-${toolIndex}`,
         kind: 'tool',
+        kindLabel: formatToolName(event.name),
         failed: event.status === 'error',
         icon: event.status === 'error' ? 'x' : 'check',
         preview: truncate(`${formatToolName(event.name)}：${event.result_preview || (event.status === 'error' ? '失败' : '完成')}`, NODE_PREVIEW_MAX),
+        detail: truncate(String(event.result_preview || '') || (event.status === 'error' ? '执行失败' : '执行完成'), 320),
       })
     })
     const answer = String(message.content || '').trim()
     if (answer) {
+      const plain = answer.replace(/[#*`>\-\n]+/g, ' ').trim()
       nodes.push({
         messageId: message.id,
         anchorId: `msg-${message.id}-answer`,
         kind: 'answer',
+        kindLabel: '回答',
         icon: 'chat',
-        preview: truncate(answer.replace(/[#*`>\-\n]+/g, ' ').trim(), NODE_PREVIEW_MAX),
+        preview: truncate(plain, NODE_PREVIEW_MAX),
+        detail: truncate(plain, 400),
       })
     }
   }
