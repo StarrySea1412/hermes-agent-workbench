@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import ChatFrame from '../components/chat/ChatFrame'
+import GlassSelect from '../components/GlassSelect'
 import {
   useAIConfig,
   useCcSwitchProviders,
@@ -377,30 +378,31 @@ export default function Settings() {
               </div>
 
               <div className="field-grid">
-                <label className="field">
+                <div className="field">
                   <span>提供方</span>
-                  <select value={formData.provider} onChange={(event) => handleProviderChange(event.target.value)}>
-                    {PROVIDERS.map((provider) => (
-                      <option key={provider.value} value={provider.value}>{provider.label}</option>
-                    ))}
-                  </select>
-                </label>
+                  <GlassSelect
+                    ariaLabel="提供方"
+                    value={formData.provider}
+                    onChange={handleProviderChange}
+                    options={PROVIDERS.map((provider) => ({ value: provider.value, label: provider.label }))}
+                  />
+                </div>
 
-                <label className="field">
+                <div className="field">
                   <span>模型名称</span>
                   <div className="input-action-row">
-                    <select
+                    <GlassSelect
+                      ariaLabel="模型名称"
                       value={selectedModelOption}
-                      onChange={(event) => {
-                        if (event.target.value === CUSTOM_MODEL_VALUE) return
-                        setEdits((prev) => ({ ...prev, model_name: event.target.value }))
+                      onChange={(next) => {
+                        if (next === CUSTOM_MODEL_VALUE) return
+                        setEdits((prev) => ({ ...prev, model_name: next }))
                       }}
-                    >
-                      {modelOptions.map((model) => (
-                        <option key={model} value={model}>{model}</option>
-                      ))}
-                      <option value={CUSTOM_MODEL_VALUE}>自定义模型</option>
-                    </select>
+                      options={[
+                        ...modelOptions.map((model) => ({ value: model, label: model })),
+                        { value: CUSTOM_MODEL_VALUE, label: '自定义模型' },
+                      ]}
+                    />
                     <input
                       type="text"
                       value={formData.model_name || ''}
@@ -411,7 +413,7 @@ export default function Settings() {
                       {fetchModelsMutation.isPending ? '获取中...' : '获取模型'}
                     </button>
                   </div>
-                </label>
+                </div>
               </div>
 
               <label className="field">
