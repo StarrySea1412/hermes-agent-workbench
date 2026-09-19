@@ -2,11 +2,14 @@
 
 AI-skill 是一个本地优先的 Hermes Agent 工作台。当前主路径是：打开聊天、配置模型、上传资料、观察工具调用、产出可下载成果。
 
+> 模型在聊天里会真实调用工具（联网搜索 / Python 沙箱 / 文件读写 / 文档导出），每一次调用都走**受控审批**，每一次文件写入都可**版本回滚**。
+
 项目包含：
 
-- React/Vite 前端：聊天工作台、资料区、技能目录、运行设置、实验性 Agent 页面
-- Django 后端：会话、项目资料、模型配置、Hermes 监控、工具调用和文件导出
+- React/Vite 前端：聊天工作台、资料区、技能目录、运行设置、实验性 Agent 页面（液态玻璃风格，亮/暗双主题，21 项 UI 质量门禁）
+- Django 后端：会话、项目资料、模型配置、Hermes 监控、受控工具审批、版本化文件写入、长期记忆和文件导出
 - Hermes Gateway 本地运行链路：通过 OpenAI-compatible `/v1` 接口承接聊天和工具调用
+
 
 
 ## 产品主线
@@ -183,7 +186,28 @@ powershell.exe -ExecutionPolicy Bypass -File .\status-ai-skill.ps1
 - Cloudflare / 403 拦截
 - 上游服务超时或 5xx
 
-在设置页使用“测试连接”，复制诊断信息再定位。聊天页失败时也会显示同一类结构化诊断。
+在设置页使用“测试连接”，复制诊断信息再定位。
+
+### 503 “No available channel for model X”（点号模型名被改写）
+
+Hermes 的 Anthropic 适配层默认把模型名里的 `.` 改写成 `-`（`grok-4.6` → `grok-4-6`）。多数中转站按**原始名**提供渠道，改写名一律 503 `No available channel`，且直接 curl 中转站用原始名明明是通的——这是最容易被误诊为”上游渠道挂了”的问题。
+
+解决：`.hermes-runtime/config.yaml` 里把 `provider:` 设为 `zai`（同走 Anthropic 协议但保留模型名点号），并注入 `GLM_API_KEY` 环境变量（`start-ai-skill.ps1` 已自动处理）。不要把 provider 改回 `anthropic`。
+
+## 安全模型
+
+- 用户模型密钥经 Fernet 加密落库（`AI_CONFIG_ENCRYPTION_KEY`），设置页不回显明文
+- 受控模式下敏感工具执行生成 `ToolExecution` 记录：pending → approved/denied/expired，决策接口幂等
+- `workspace_files` 写入保留版本链，支持一键回滚到改动前内容
+- 网关服务密钥（`dev-test-key-for-local`）仅限本地开发，部署时必须更换
+- `backend/.env`、`backend/db.sqlite3`、`.hermes-runtime/`、`media/` 均已被 .gitignore 排除，不会进入版本库
+
+## Roadmap
+
+- [ ] 任务级检查点与断点恢复（长任务挂机续跑）
+- [ ] Multi-Agent 协作（AgentRun 作为可派发的子任务单元）
+- [ ] MCP 服务器接入纳入受控审批流
+- [ ] 项目级跨会话记忆
 
 ## 更多文档
 

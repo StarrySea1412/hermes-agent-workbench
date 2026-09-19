@@ -13,5 +13,6 @@ PyJWT>=2.8
 PyPDF2>=3.0
 docx2txt>=0.8
 python-docx>=1.0
+ddgs>=9.0
 gunicorn>=21.2
 psycopg2-binary>=2.9
