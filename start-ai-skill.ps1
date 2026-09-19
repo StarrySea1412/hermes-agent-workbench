@@ -141,13 +141,21 @@ $env:HERMES_ACCEPT_HOOKS = "1"
 
 # Anthropic 协议的网关运行时需要 ANTHROPIC_API_KEY 环境变量（hermes 入口强制校验），
 # 从 config.yaml 取同一家密钥注入，避免设置页切换供应商后网关起不来。
+# provider=zai 时 hermes 改从 GLM_API_KEY 取密钥，同样从 config.yaml 注入。
+# provider 必须保持 zai（而非 anthropic）：hermes 的 anthropic 适配层会把模型名里的
+# 点号改写成横杠（grok-4.6 -> grok-4-6），中转站按原始名提供渠道，改写后一律 503
+# "No available channel"。zai 供应商保留点号，是点号模型名的既定用法。
 $gatewayConfigPath = Join-Path $HermesHome "config.yaml"
 if ((Test-Path -LiteralPath $gatewayConfigPath) -and -not $env:ANTHROPIC_API_KEY) {
     $configText = Get-Content -LiteralPath $gatewayConfigPath -Raw -ErrorAction SilentlyContinue
-    if ($configText -match '(?m)^\s*provider:\s*anthropic\s*$') {
-        $keyMatch = [regex]::Match($configText, '(?m)^\s*api_key:\s*(\S+)')
-        if ($keyMatch.Success) {
-            $env:ANTHROPIC_API_KEY = $keyMatch.Groups[1].Value.Trim()
+    $keyMatch = [regex]::Match($configText, '(?m)^\s*api_key:\s*(\S+)')
+    if ($keyMatch.Success) {
+        $resolvedKey = $keyMatch.Groups[1].Value.Trim()
+        if (-not $env:ANTHROPIC_API_KEY) {
+            $env:ANTHROPIC_API_KEY = $resolvedKey
+        }
+        if ($configText -match '(?m)^\s*provider:\s*zai\s*$' -and -not $env:GLM_API_KEY) {
+            $env:GLM_API_KEY = $resolvedKey
         }
     }
 }
